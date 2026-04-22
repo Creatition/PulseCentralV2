@@ -197,20 +197,23 @@ const API = (() => {
       if (p.pairAddress) byPair.set(p.pairAddress.toLowerCase(), p);
     }
 
-    // For PLS, also fetch live chart bars from GeckoTerminal
-    const plsCoin   = CORE_COINS[0];
-    const plsChartP = getChartBars(plsCoin.pair).catch(() => []);
-
-    const plsBars = await plsChartP;
+    // Fetch live bars for PLS from GeckoTerminal (WPLS/DAI pair has good history)
+    const plsCoin   = CORE_COINS[0]; // PLS
+    const plsBars   = await getChartBars(plsCoin.pair).catch(() => []);
 
     return CORE_COINS.map(coin => {
-      const pair    = byPair.get(coin.pair.toLowerCase()) || null;
-      const isPls   = coin.symbol === 'PLS';
-      const bars    = isPls
-        ? plsBars
-        : (Array.isArray(snapshots.coins?.[coin.symbol]) && snapshots.coins[coin.symbol].length >= 1
-            ? snapshots.coins[coin.symbol]
-            : []);
+      const pair = byPair.get(coin.pair.toLowerCase()) || null;
+      const isPls = coin.symbol === 'PLS';
+      let bars;
+      if (isPls) {
+        // Use live fetched bars, fall back to snapshot if available
+        bars = plsBars.length > 0 ? plsBars :
+          (Array.isArray(snapshots.coins?.['PLS']) ? snapshots.coins['PLS'] : []);
+      } else {
+        bars = Array.isArray(snapshots.coins?.[coin.symbol]) && snapshots.coins[coin.symbol].length >= 1
+          ? snapshots.coins[coin.symbol]
+          : [];
+      }
       return { ...coin, pair, bars };
     });
   }
@@ -380,12 +383,14 @@ const API = (() => {
 
     const groups = new Map();
     for (const t of tokenTxs) {
-      if (t.contractAddress?.toLowerCase() === WPLS_LOW) continue;
-      const h = t.hash.toLowerCase();
+      if (!t.contractAddress) continue; // skip if no contract address
+      if ((t.contractAddress || '').toLowerCase() === WPLS_LOW) continue;
+      const h = (t.hash || '').toLowerCase();
+      if (!h) continue;
       if (!groups.has(h)) groups.set(h, { in: [], out: [], ts: t.timeStamp });
       const g = groups.get(h);
-      if (t.to?.toLowerCase() === addrLow)   g.in.push(t);
-      else if (t.from?.toLowerCase() === addrLow) g.out.push(t);
+      if ((t.to || '').toLowerCase() === addrLow)   g.in.push(t);
+      else if ((t.from || '').toLowerCase() === addrLow) g.out.push(t);
     }
 
     const trades = [];
@@ -394,14 +399,15 @@ const API = (() => {
       const normal  = normalMap.get(hash);
       const shortH  = hash.slice(0, 10) + '…';
 
-      if (inc.length > 0 && normal?.from?.toLowerCase() === addrLow) {
+      if (inc.length > 0 && (normal?.from || '').toLowerCase() === addrLow) {
         const pls = Number(normal.value) / 1e18;
         if (pls > 0) {
           const plsPer = pls / inc.length;
           for (const t of inc) {
+            if (!t.contractAddress) continue;
             const amt = Number(t.value) / Math.pow(10, Number(t.tokenDecimal) || 18);
             if (amt <= 0) continue;
-            trades.push({ type: 'buy', tokenAddress: t.contractAddress.toLowerCase(), tokenSymbol: t.tokenSymbol || '?', tokenName: t.tokenName || t.tokenSymbol || '?', date, tokenAmount: amt, plsAmount: plsPer, usdValue: 0, pricePerTokenPls: amt > 0 ? plsPer / amt : 0, notes: `Imported from tx ${shortH}`, txHash: hash });
+            trades.push({ type: 'buy', tokenAddress: (t.contractAddress || '').toLowerCase(), tokenSymbol: t.tokenSymbol || '?', tokenName: t.tokenName || t.tokenSymbol || '?', date, tokenAmount: amt, plsAmount: plsPer, usdValue: 0, pricePerTokenPls: amt > 0 ? plsPer / amt : 0, notes: `Imported from tx ${shortH}`, txHash: hash });
           }
         }
       }
@@ -410,9 +416,10 @@ const API = (() => {
         const pls    = internalPls.get(hash);
         const plsPer = pls / out.length;
         for (const t of out) {
+          if (!t.contractAddress) continue;
           const amt = Number(t.value) / Math.pow(10, Number(t.tokenDecimal) || 18);
           if (amt <= 0) continue;
-          trades.push({ type: 'sell', tokenAddress: t.contractAddress.toLowerCase(), tokenSymbol: t.tokenSymbol || '?', tokenName: t.tokenName || t.tokenSymbol || '?', date, tokenAmount: amt, plsAmount: plsPer, usdValue: 0, pricePerTokenPls: amt > 0 ? plsPer / amt : 0, notes: `Imported from tx ${shortH}`, txHash: hash });
+          trades.push({ type: 'sell', tokenAddress: (t.contractAddress || '').toLowerCase(), tokenSymbol: t.tokenSymbol || '?', tokenName: t.tokenName || t.tokenSymbol || '?', date, tokenAmount: amt, plsAmount: plsPer, usdValue: 0, pricePerTokenPls: amt > 0 ? plsPer / amt : 0, notes: `Imported from tx ${shortH}`, txHash: hash });
         }
       }
     }

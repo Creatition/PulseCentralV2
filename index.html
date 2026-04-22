@@ -24,12 +24,19 @@
   </a>
 
   <nav class="tab-nav" role="tablist" aria-label="Main navigation">
-    <button class="tab-btn" data-tab="home"      role="tab" aria-selected="true"  aria-controls="tab-home">
-      <span aria-hidden="true">🏠</span><span class="tab-label">Home</span>
-    </button>
-    <button class="tab-btn" data-tab="markets"   role="tab" aria-selected="false" aria-controls="tab-markets">
-      <span aria-hidden="true">📊</span><span class="tab-label">Markets</span>
-    </button>
+    <div class="tab-dropdown-wrap">
+      <button class="tab-btn has-dropdown" data-tab="markets" role="tab" aria-selected="false" aria-controls="tab-markets" aria-haspopup="true">
+        <span aria-hidden="true">📊</span><span class="tab-label">Markets</span><span class="dropdown-arrow">▾</span>
+      </button>
+      <div class="tab-dropdown" id="markets-dropdown">
+        <button class="tab-dropdown-item active-sub" data-subtab="pulsechain" onclick="switchMarketsSubtab('pulsechain')">
+          ⚡ PulseChain
+        </button>
+        <button class="tab-dropdown-item" data-subtab="crypto100" onclick="switchMarketsSubtab('crypto100')">
+          🌐 Crypto Top 100
+        </button>
+      </div>
+    </div>
     <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio">
       <span aria-hidden="true">💼</span><span class="tab-label">Portfolio</span>
     </button>
@@ -168,51 +175,67 @@
      ═══════════════════════════════════════════════════ -->
 <div id="tab-markets" class="tab-panel" role="tabpanel">
   <div class="page">
-    <div class="page-title">Markets</div>
-    <div class="page-subtitle">Top PulseChain tokens by volume</div>
+    <!-- Sub-tab: PulseChain -->
+    <div id="markets-sub-pulsechain" class="markets-subtab active-subtab">
+      <div class="page-title">PulseChain Markets</div>
+      <div class="page-subtitle">Top PulseChain tokens by volume</div>
 
-    <!-- Toolbar -->
-    <div class="market-toolbar">
-      <div class="search-wrap">
-        <span class="search-icon" aria-hidden="true">🔍</span>
-        <input type="search" class="input search-input" id="market-search" placeholder="Search token name or address…" autocomplete="off" spellcheck="false" aria-label="Search tokens">
-        <div class="search-dropdown hidden" id="search-dropdown" role="listbox" aria-label="Search results"></div>
+      <!-- Toolbar -->
+      <div class="market-toolbar">
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input type="search" class="input search-input" id="market-search" placeholder="Search any token across all chains…" autocomplete="off" spellcheck="false" aria-label="Search tokens">
+          <div class="search-dropdown hidden" id="search-dropdown" role="listbox" aria-label="Search results"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="markets-refresh-btn">↻ Refresh</button>
       </div>
-      <button class="btn btn-ghost btn-sm" id="markets-refresh-btn">↻ Refresh</button>
+
+      <!-- Loading / error -->
+      <div class="page-loader" id="markets-loading"><div class="spinner"></div><div>Fetching market data…</div></div>
+      <div class="error-banner hidden" id="markets-error" role="alert"></div>
+
+      <!-- Market list -->
+      <div id="market-list" class="hidden">
+        <div class="market-pagination">
+          <button class="btn btn-ghost btn-sm" id="prev-btn" disabled aria-label="Previous page">← Prev</button>
+          <span id="page-info" aria-live="polite"></span>
+          <button class="btn btn-ghost btn-sm" id="next-btn" aria-label="Next page">Next →</button>
+        </div>
+        <div class="market-header" role="row">
+          <span>#</span>
+          <span>Token</span>
+          <button class="sort-btn" data-col="price" role="columnheader">Price</button>
+          <button class="sort-btn" data-col="change" role="columnheader">24h</button>
+          <button class="sort-btn hide-mobile" data-col="mcap" role="columnheader">Mkt Cap</button>
+          <button class="sort-btn hide-mobile" data-col="vol" role="columnheader">Volume</button>
+          <button class="sort-btn hide-mobile" data-col="liq" role="columnheader">Liquidity</button>
+        </div>
+        <div id="market-rows" role="rowgroup"></div>
+        <div class="market-pagination">
+          <button class="btn btn-ghost btn-sm" id="prev-btn-bot" disabled aria-label="Previous page">← Prev</button>
+          <span id="page-info-bot" aria-live="polite"></span>
+          <button class="btn btn-ghost btn-sm" id="next-btn-bot" aria-label="Next page">Next →</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Loading / error -->
-    <div class="page-loader" id="markets-loading"><div class="spinner"></div><div>Fetching market data…</div></div>
-    <div class="error-banner hidden" id="markets-error" role="alert"></div>
-
-    <!-- Market list -->
-    <div id="market-list" class="hidden">
-      <!-- Top pagination -->
-      <div class="market-pagination">
-        <button class="btn btn-ghost btn-sm" id="prev-btn" disabled aria-label="Previous page">← Prev</button>
-        <span id="page-info" aria-live="polite"></span>
-        <button class="btn btn-ghost btn-sm" id="next-btn" aria-label="Next page">Next →</button>
-      </div>
-
-      <!-- Column headers -->
-      <div class="market-header" role="row">
-        <span>#</span>
-        <span>Token</span>
-        <button class="sort-btn" data-col="price" role="columnheader">Price</button>
-        <button class="sort-btn" data-col="change" role="columnheader">24h</button>
-        <button class="sort-btn hide-mobile" data-col="mcap" role="columnheader">Mkt Cap</button>
-        <button class="sort-btn hide-mobile" data-col="vol" role="columnheader">Volume</button>
-        <button class="sort-btn hide-mobile" data-col="liq" role="columnheader">Liquidity</button>
-      </div>
-
-      <!-- Rows injected by JS -->
-      <div id="market-rows" role="rowgroup"></div>
-
-      <!-- Bottom pagination -->
-      <div class="market-pagination">
-        <button class="btn btn-ghost btn-sm" id="prev-btn-bot" disabled aria-label="Previous page">← Prev</button>
-        <span id="page-info-bot" aria-live="polite"></span>
-        <button class="btn btn-ghost btn-sm" id="next-btn-bot" aria-label="Next page">Next →</button>
+    <!-- Sub-tab: Crypto Top 100 -->
+    <div id="markets-sub-crypto100" class="markets-subtab hidden">
+      <div class="page-title">Crypto Top 100</div>
+      <div class="page-subtitle">Top 100 cryptocurrencies by market cap</div>
+      <div class="page-loader" id="crypto100-loading"><div class="spinner"></div><div>Fetching global market data…</div></div>
+      <div class="error-banner hidden" id="crypto100-error" role="alert"></div>
+      <div id="crypto100-list" class="hidden">
+        <div class="market-header crypto100-header" role="row">
+          <span>#</span>
+          <span>Coin</span>
+          <span class="r">Price</span>
+          <span class="r">24h</span>
+          <span class="r hide-mobile">7d</span>
+          <span class="r hide-mobile">Market Cap</span>
+          <span class="r hide-mobile">Volume 24h</span>
+        </div>
+        <div id="crypto100-rows"></div>
       </div>
     </div>
 
@@ -653,19 +676,19 @@
       <div class="links-section-title">Official</div>
       <div class="links-grid">
         <a class="link-card" href="https://pulsechain.com" target="_blank" rel="noopener">
-          <div class="link-ph-icon">⚡</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=pulsechain.com&sz=64" alt="" onerror="this.parentElement.innerHTML='⚡'"></div>
           <div><div class="link-body-name">PulseChain</div><div class="link-body-desc">Official PulseChain website</div></div>
         </a>
         <a class="link-card" href="https://bridge.pulsechain.com" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🌉</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=bridge.pulsechain.com&sz=64" alt="" onerror="this.parentElement.innerHTML='🌉'"></div>
           <div><div class="link-body-name">PulseChain Bridge</div><div class="link-body-desc">Bridge tokens from Ethereum</div></div>
         </a>
         <a class="link-card" href="https://scan.pulsechain.com" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🔍</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=scan.pulsechain.com&sz=64" alt="" onerror="this.parentElement.innerHTML='🔍'"></div>
           <div><div class="link-body-name">PulseScan</div><div class="link-body-desc">Block explorer &amp; wallet lookup</div></div>
         </a>
         <a class="link-card" href="https://hex.com" target="_blank" rel="noopener">
-          <div class="link-ph-icon" style="background:rgba(232,0,45,.12);border-color:#e8002d;">❤️</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=hex.com&sz=64" alt="" onerror="this.parentElement.innerHTML='❤️'"></div>
           <div><div class="link-body-name">HEX</div><div class="link-body-desc">HEX.com — stake &amp; earn</div></div>
         </a>
       </div>
@@ -675,27 +698,27 @@
       <div class="links-section-title">DEX &amp; Trading</div>
       <div class="links-grid">
         <a class="link-card" href="https://pulsex.com" target="_blank" rel="noopener">
-          <div class="link-ph-icon" style="background:rgba(255,109,0,.12);border-color:#ff6d00;">🔄</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=pulsex.com&sz=64" alt="" onerror="this.parentElement.innerHTML='🔄'"></div>
           <div><div class="link-body-name">PulseX</div><div class="link-body-desc">Native PulseChain DEX</div></div>
         </a>
         <a class="link-card" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener">
-          <div class="link-ph-icon">📈</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=dexscreener.com&sz=64" alt="" onerror="this.parentElement.innerHTML='📈'"></div>
           <div><div class="link-body-name">DexScreener</div><div class="link-body-desc">Charts, pairs &amp; market data</div></div>
         </a>
         <a class="link-card" href="https://app.piteas.io" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🎯</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=app.piteas.io&sz=64" alt="" onerror="this.parentElement.innerHTML='🎯'"></div>
           <div><div class="link-body-name">Piteas</div><div class="link-body-desc">DEX aggregator for best prices</div></div>
         </a>
         <a class="link-card" href="https://9mm.pro" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🎱</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=9mm.pro&sz=64" alt="" onerror="this.parentElement.innerHTML='🎱'"></div>
           <div><div class="link-body-name">9mm DEX</div><div class="link-body-desc">Concentrated liquidity DEX</div></div>
         </a>
         <a class="link-card" href="https://libertyswap.finance" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🗽</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=libertyswap.finance&sz=64" alt="" onerror="this.parentElement.innerHTML='🗽'"></div>
           <div><div class="link-body-name">LibertySwap</div><div class="link-body-desc">PulseChain swap &amp; yield</div></div>
         </a>
         <a class="link-card" href="https://www.dextools.io/app/en/pulse" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🔧</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=dextools.io&sz=64" alt="" onerror="this.parentElement.innerHTML='🔧'"></div>
           <div><div class="link-body-name">DexTools</div><div class="link-body-desc">Advanced PulseChain charts</div></div>
         </a>
       </div>
@@ -705,15 +728,15 @@
       <div class="links-section-title">Analytics &amp; Data</div>
       <div class="links-grid">
         <a class="link-card" href="https://defillama.com/chain/PulseChain" target="_blank" rel="noopener">
-          <div class="link-ph-icon">📊</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=defillama.com&sz=64" alt="" onerror="this.parentElement.innerHTML='📊'"></div>
           <div><div class="link-body-name">DefiLlama</div><div class="link-body-desc">TVL, protocols &amp; yield data</div></div>
         </a>
         <a class="link-card" href="https://gopluslabs.io" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🛡️</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=gopluslabs.io&sz=64" alt="" onerror="this.parentElement.innerHTML='🛡️'"></div>
           <div><div class="link-body-name">GoPlus Security</div><div class="link-body-desc">Token security scanner</div></div>
         </a>
         <a class="link-card" href="https://www.geckoterminal.com/pulsechain/pools" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🦎</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=geckoterminal.com&sz=64" alt="" onerror="this.parentElement.innerHTML='🦎'"></div>
           <div><div class="link-body-name">GeckoTerminal</div><div class="link-body-desc">Pool explorer &amp; OHLCV data</div></div>
         </a>
       </div>
@@ -723,19 +746,19 @@
       <div class="links-section-title">Community</div>
       <div class="links-grid">
         <a class="link-card" href="https://twitter.com/pulsechaincom" target="_blank" rel="noopener">
-          <div class="link-ph-icon">𝕏</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=twitter.com&sz=64" alt="" onerror="this.parentElement.innerHTML='𝕏'"></div>
           <div><div class="link-body-name">PulseChain X</div><div class="link-body-desc">Official Twitter/X account</div></div>
         </a>
         <a class="link-card" href="https://t.me/PulseChainCom" target="_blank" rel="noopener">
-          <div class="link-ph-icon">✈️</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=telegram.org&sz=64" alt="" onerror="this.parentElement.innerHTML='✈️'"></div>
           <div><div class="link-body-name">PulseChain Telegram</div><div class="link-body-desc">Official Telegram community</div></div>
         </a>
         <a class="link-card" href="https://www.reddit.com/r/PulseChain/" target="_blank" rel="noopener">
-          <div class="link-ph-icon">🟠</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=reddit.com&sz=64" alt="" onerror="this.parentElement.innerHTML='🟠'"></div>
           <div><div class="link-body-name">r/PulseChain</div><div class="link-body-desc">Reddit community</div></div>
         </a>
         <a class="link-card" href="https://github.com/Creatition/PulseCentral" target="_blank" rel="noopener">
-          <div class="link-ph-icon">&lt;/&gt;</div>
+          <div class="link-favicon-wrap"><img class="link-favicon" src="https://www.google.com/s2/favicons?domain=github.com&sz=64" alt="" onerror="this.parentElement.innerHTML='&lt;/&gt;'"></div>
           <div><div class="link-body-name">PulseCentral GitHub</div><div class="link-body-desc">Source code for this app</div></div>
         </a>
       </div>

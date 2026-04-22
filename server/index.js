@@ -16,7 +16,7 @@ app.use((req, res, next) => {
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https://cdn.dexscreener.com https://dd.dexscreener.com https://dexscreener.com https://icons.llamao.fi https://scan.pulsechain.com https://libertyswap.finance https://9mm.pro https://app.piteas.io https://www.geckoterminal.com https://hex.com https://www.dextools.io",
+    "img-src 'self' data: https://cdn.dexscreener.com https://dd.dexscreener.com https://dexscreener.com https://icons.llamao.fi https://scan.pulsechain.com https://libertyswap.finance https://9mm.pro https://app.piteas.io https://www.geckoterminal.com https://hex.com https://www.dextools.io https://www.google.com https://t2.gstatic.com https://coin-images.coingecko.com https://assets.coingecko.com",
     "frame-src https://dexscreener.com https://pulsex.mypinata.cloud",
     "connect-src 'self'",
     "object-src 'none'",
@@ -179,14 +179,28 @@ app.get('/api/coingecko/global', (req, res) => {
   proxy(res, 'https://api.coingecko.com/api/v3/global');
 });
 
+app.get('/api/coingecko/markets', (req, res) => {
+  const qs = req.query;
+  const params = new URLSearchParams({
+    vs_currency: qs.vs_currency || 'usd',
+    order: qs.order || 'market_cap_desc',
+    per_page: qs.per_page || '100',
+    page: qs.page || '1',
+    sparkline: qs.sparkline || 'false',
+    price_change_percentage: qs.price_change_percentage || '24h,7d',
+  });
+  proxy(res, `https://api.coingecko.com/api/v3/coins/markets?${params}`);
+});
+
 /* ── Weekly chart snapshot (served from disk cache) ───── */
 // Server pre-builds weekly OHLCV snapshots using GeckoTerminal
 // so the browser doesn't have to fetch large datasets on every load.
 
 const SNAPSHOT_FILE = path.join(__dirname, 'data', 'chart-snapshots.json');
 
-// Coins to snapshot: PLSX, HEX, INC, PRVX (PLS is fetched live)
+// Coins to snapshot: PLS, PLSX, HEX, INC, PRVX
 const SNAPSHOT_COINS = [
+  { symbol: 'PLS',  pair: '0xe56043671df55de5cdf8459710433c10324de0ae' },
   { symbol: 'PLSX', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9' },
   { symbol: 'HEX',  pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65' },
   { symbol: 'INC',  pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa' },

@@ -409,7 +409,7 @@ input, select, textarea { font-family: var(--font); }
 
 /* Chart area */
 .coin-chart-area { padding: 0 1.125rem 1rem; }
-.coin-chart-svg  { width: 100%; height: 80px; display: block; border-radius: 6px; }
+.coin-chart-svg  { width: 100%; height: 100px; display: block; border-radius: 6px; overflow: visible; }
 .coin-chart-tf   {
   display: flex; gap: .25rem; margin-bottom: .5rem;
 }
@@ -432,9 +432,9 @@ input, select, textarea { font-family: var(--font); }
 
 /* Watchlist star */
 .star-btn {
-  width: 28px; height: 28px;
+  width: 56px; height: 56px;
   border-radius: 50%;
-  font-size: 1rem;
+  font-size: 2rem;
   color: var(--text-3);
   display: flex; align-items: center; justify-content: center;
   transition: all .15s;
@@ -442,6 +442,8 @@ input, select, textarea { font-family: var(--font); }
 }
 .star-btn:hover { color: var(--yellow); background: rgba(245,158,11,.1); }
 .star-btn.active { color: var(--yellow); }
+/* Smaller star in market rows */
+.market-row .star-btn { width: 32px; height: 32px; font-size: 1.1rem; }
 
 /* ── Ecosystem stats ─────────────────────────────────── */
 .eco-section { margin-top: 1.5rem; }
@@ -1139,3 +1141,139 @@ input, select, textarea { font-family: var(--font); }
     grid-template-columns: 1.5rem 1fr 5.5rem;
   }
 }
+
+/* ══════════════════════════════════════════════════════════
+   NEW FEATURES — ADDED
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Link favicon icons ──────────────────────────────── */
+.link-favicon-wrap {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: 1.2rem;
+}
+.link-favicon {
+  width: 28px; height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+}
+
+/* ── Markets dropdown nav ────────────────────────────── */
+.tab-dropdown-wrap {
+  position: relative;
+}
+.has-dropdown .dropdown-arrow {
+  font-size: .65rem;
+  margin-left: .2rem;
+  opacity: .6;
+  transition: transform .2s;
+}
+.tab-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  z-index: 200;
+  overflow: hidden;
+}
+.tab-dropdown.open { display: block; }
+.tab-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  padding: .65rem 1rem;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background .1s, color .1s;
+}
+.tab-dropdown-item:hover { background: var(--bg-2); color: var(--text); }
+.tab-dropdown-item.active-sub {
+  color: var(--primary);
+  background: var(--primary-dim);
+  font-weight: 700;
+}
+
+/* ── Markets subtabs ─────────────────────────────────── */
+.markets-subtab { display: block; }
+.markets-subtab.hidden { display: none; }
+
+/* ── Crypto Top 100 ──────────────────────────────────── */
+.crypto100-header {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 7rem 6rem 6rem 9rem 9rem;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+}
+.crypto100-row {
+  grid-template-columns: 2.5rem 1fr 7rem 6rem 6rem 9rem 9rem !important;
+}
+
+/* ── Coin sub-grid (2×2 for HEX/PLSX/INC/PRVX) ──────── */
+.coin-subgrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 600px) {
+  .coin-subgrid { grid-template-columns: 1fr; }
+}
+
+/* ── Ticker logo ─────────────────────────────────────── */
+.ticker-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+.ticker-logo-img {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-3);
+  display: block;
+}
+.ticker-logo-ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  font-size: .42rem;
+  font-weight: 700;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.ticker-rank {
+  font-size: .65rem;
+  color: var(--text-3);
+  margin-right: .1rem;
+}
+
+/* ── Chart with price labels ─────────────────────────── */
+.coin-chart-svg { width: 100%; height: 100px; display: block; border-radius: 6px; overflow: visible; }

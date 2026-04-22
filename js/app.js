@@ -124,7 +124,7 @@ function buildLogoPh(symbol, size = '') {
    ══════════════════════════════════════════════════════ */
 
 function buildChartSvg(bars, color = '#7b2fff') {
-  const W = 600, H = 100, pad = 8;
+  const W = 600, H = 110, pad = 8, labelW = 52;
   if (!bars || bars.length < 2) return null;
 
   const prices = bars.map(b => b.close).filter(v => v > 0);
@@ -133,21 +133,36 @@ function buildChartSvg(bars, color = '#7b2fff') {
   const minP  = Math.min(...prices);
   const maxP  = Math.max(...prices);
   const range = maxP - minP || maxP * 0.05 || 1;
+  const curP  = prices[prices.length - 1];
+  const chartW = W - labelW - pad;
 
   const pts = prices.map((p, i) => [
-    pad + (i / (prices.length - 1)) * (W - pad * 2),
-    H - pad - ((p - minP) / range) * (H - pad * 2),
+    pad + (i / (prices.length - 1)) * chartW,
+    pad + ((maxP - p) / range) * (H - pad * 2 - 14),
   ]);
 
   const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L${(W - pad).toFixed(1)},${H} L${pad},${H} Z`;
+  const areaPath = `${linePath} L${(pad + chartW).toFixed(1)},${H - 14} L${pad},${H - 14} Z`;
   const gid = 'g' + Math.random().toString(36).slice(2, 7);
+
+  // Format price for label (compact)
+  function fmtLabel(v) {
+    if (v >= 1000) return '$' + (v/1000).toFixed(1) + 'K';
+    if (v >= 1)    return '$' + v.toFixed(3);
+    if (v >= 0.001) return '$' + v.toFixed(5);
+    const exp = Math.floor(Math.log10(v));
+    return '$' + v.toExponential(2);
+  }
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('preserveAspectRatio', 'none');
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   svg.className = 'coin-chart-svg';
+
+  const curY = pts[pts.length - 1][1];
+  const isUp = curP >= prices[0];
+  const changeColor = isUp ? '#00e676' : '#ff5252';
 
   svg.innerHTML = `
     <defs>
@@ -157,7 +172,15 @@ function buildChartSvg(bars, color = '#7b2fff') {
       </linearGradient>
     </defs>
     <path d="${areaPath}" fill="url(#${gid})"/>
-    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Current price label on right -->
+    <line x1="${(pad + chartW).toFixed(1)}" y1="${curY.toFixed(1)}" x2="${(pad + chartW + 4).toFixed(1)}" y2="${curY.toFixed(1)}" stroke="${changeColor}" stroke-width="1" stroke-dasharray="2,2"/>
+    <rect x="${(pad + chartW + 4).toFixed(1)}" y="${Math.max(4, curY - 8).toFixed(1)}" width="${labelW - 6}" height="14" rx="3" fill="${changeColor}" opacity="0.15"/>
+    <text x="${(pad + chartW + labelW/2 + 1).toFixed(1)}" y="${Math.max(14, curY + 3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-family="monospace" fill="${changeColor}" font-weight="700">${fmtLabel(curP)}</text>
+    <!-- High label -->
+    <text x="${(pad + chartW + labelW/2 + 1).toFixed(1)}" y="10" text-anchor="middle" font-size="7.5" font-family="monospace" fill="#888">${fmtLabel(maxP)}</text>
+    <!-- Low label -->
+    <text x="${(pad + chartW + labelW/2 + 1).toFixed(1)}" y="${H - 16}" text-anchor="middle" font-size="7.5" font-family="monospace" fill="#888">${fmtLabel(minP)}</text>`;
 
   return svg;
 }
@@ -313,7 +336,7 @@ const Alerts = (() => {
    TAB NAVIGATION
    ══════════════════════════════════════════════════════ */
 
-const tabs = document.querySelectorAll('.tab-btn');
+const tabs = document.querySelectorAll('.tab-btn:not(.modal-tab-btn)');
 const panels = document.querySelectorAll('.tab-panel');
 let activeTab = 'home';
 
@@ -335,6 +358,34 @@ function switchTab(name) {
 tabs.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 qs('.logo-link')?.addEventListener('click', () => switchTab('home'));
 
+// Markets dropdown toggle
+const marketsDropWrap = document.querySelector('.tab-dropdown-wrap');
+const marketsDropMenu = document.getElementById('markets-dropdown');
+if (marketsDropWrap && marketsDropMenu) {
+  marketsDropWrap.querySelector('.tab-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    switchTab('markets');
+    marketsDropMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', () => marketsDropMenu.classList.remove('open'));
+  marketsDropMenu.addEventListener('click', e => e.stopPropagation());
+}
+
+let activeMarketsSubtab = 'pulsechain';
+function switchMarketsSubtab(subtab) {
+  activeMarketsSubtab = subtab;
+  document.querySelectorAll('.markets-subtab').forEach(el => {
+    el.classList.toggle('hidden', el.id !== `markets-sub-${subtab}`);
+    el.classList.toggle('active-subtab', el.id === `markets-sub-${subtab}`);
+  });
+  document.querySelectorAll('.tab-dropdown-item').forEach(btn => {
+    btn.classList.toggle('active-sub', btn.dataset.subtab === subtab);
+  });
+  if (marketsDropMenu) marketsDropMenu.classList.remove('open');
+  if (subtab === 'crypto100') loadCrypto100();
+}
+window.switchMarketsSubtab = switchMarketsSubtab;
+
 /* ══════════════════════════════════════════════════════
    TICKER BAR
    ══════════════════════════════════════════════════════ */
@@ -348,7 +399,8 @@ function buildTickerItem(pair, rank) {
   const price   = Number(pair.priceUsd || 0);
   const { text, cls } = fmt.change(Number(pair.priceChange?.h24 || 0));
   const pairAddr = pair.pairAddress || '';
-  const logoUrl  = API.logoUrl(pair, pair.baseToken?.address);
+  const tokenAddr = pair.baseToken?.address || '';
+  const logoUrl  = API.logoUrl(pair, tokenAddr);
 
   const a = document.createElement('a');
   a.className = 'ticker-item';
@@ -358,15 +410,45 @@ function buildTickerItem(pair, rank) {
 
   if (rank) {
     const r = document.createElement('span');
-    r.style.cssText = 'font-size:.65rem;color:var(--text-3);margin-right:.15rem;';
+    r.className = 'ticker-rank';
     r.textContent = `#${rank}`;
     a.appendChild(r);
   }
 
-  const logo = buildLogo(logoUrl, pair.baseToken?.address, symbol, 'sm');
-  if (logo.tagName === 'IMG') { logo.className = 'ticker-item'; logo.style.cssText = 'width:16px;height:16px;border-radius:50%;object-fit:cover;background:var(--bg-3);flex-shrink:0;'; }
-  else { logo.className = 'ticker-ph'; logo.style.cssText = 'width:16px;height:16px;font-size:.45rem;'; }
-  a.appendChild(logo);
+  // Build logo properly — try image first, fallback to placeholder
+  const logoWrap = document.createElement('span');
+  logoWrap.className = 'ticker-logo-wrap';
+
+  const urls = [];
+  if (logoUrl) urls.push(logoUrl);
+  if (tokenAddr) {
+    const l = tokenAddr.toLowerCase();
+    urls.push(`https://dd.dexscreener.com/ds-data/tokens/pulsechain/${l}.png`);
+    urls.push(`https://scan.pulsechain.com/token-images/${l}.png`);
+  }
+
+  if (urls.length > 0) {
+    const img = document.createElement('img');
+    img.alt = symbol;
+    img.className = 'ticker-logo-img';
+    let idx = 0;
+    const tryNext = () => {
+      if (idx < urls.length) { img.src = urls[idx++]; }
+      else {
+        const ph = document.createElement('span');
+        ph.className = 'ticker-logo-ph';
+        ph.textContent = symbol.slice(0, 2);
+        logoWrap.replaceWith(ph);
+      }
+    };
+    img.onerror = tryNext;
+    tryNext();
+    logoWrap.appendChild(img);
+  } else {
+    logoWrap.className = 'ticker-logo-ph';
+    logoWrap.textContent = symbol.slice(0, 2);
+  }
+  a.appendChild(logoWrap);
 
   const sym = document.createElement('span');
   sym.className = 'ticker-sym';
@@ -520,10 +602,19 @@ async function loadHome() {
     hide(loading);
     if (grid) {
       grid.innerHTML = '';
-      coins.forEach(coin => {
-        if (coin.hideFromHome) return;
-        grid.appendChild(buildCoinCard(coin));
-      });
+      // PLS goes full-width first
+      const plsCoin = coins.find(c => c.symbol === 'PLS');
+      if (plsCoin && !plsCoin.hideFromHome) {
+        grid.appendChild(buildCoinCard(plsCoin));
+      }
+      // Remaining 4 coins (HEX, PLSX, INC, PRVX) in a 2x2 sub-grid
+      const subCoins = coins.filter(c => c.symbol !== 'PLS' && !c.hideFromHome);
+      if (subCoins.length > 0) {
+        const subGrid = document.createElement('div');
+        subGrid.className = 'coin-subgrid';
+        subCoins.forEach(coin => subGrid.appendChild(buildCoinCard(coin)));
+        grid.appendChild(subGrid);
+      }
     }
     updateHomeTimestamp();
     checkAlerts(coins);
@@ -924,6 +1015,74 @@ document.querySelectorAll('.sort-btn').forEach(b => {
 ['next-btn','next-btn-bot'].forEach(id => $(id)?.addEventListener('click', () => { marketPage++; renderMarketList(); }));
 $('markets-refresh-btn')?.addEventListener('click', () => { marketLoaded = false; marketPairs = []; marketPage = 1; loadMarkets(); });
 
+/* ── Crypto Top 100 ────────────────────────────────── */
+
+let crypto100Loaded = false;
+
+async function loadCrypto100() {
+  if (crypto100Loaded) return;
+  crypto100Loaded = true;
+  const loading = $('crypto100-loading');
+  const error   = $('crypto100-error');
+  const list    = $('crypto100-list');
+  show(loading); hide(error); hide(list);
+  try {
+    const data = await fetch('/api/coingecko/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d').then(r => r.json());
+    if (!Array.isArray(data)) throw new Error('Invalid response from CoinGecko');
+    hide(loading);
+    renderCrypto100(data);
+    show(list);
+  } catch (e) {
+    hide(loading);
+    if (error) { error.textContent = `Failed: ${e.message}`; show(error); }
+  }
+}
+
+function renderCrypto100(coins) {
+  const rows = $('crypto100-rows');
+  if (!rows) return;
+  rows.innerHTML = '';
+  coins.forEach((coin, i) => {
+    const chg24 = fmt.change(coin.price_change_percentage_24h);
+    const chg7d = fmt.change(coin.price_change_percentage_7d_in_currency);
+    const row = document.createElement('a');
+    row.className = 'market-row crypto100-row';
+    row.href = `https://www.coingecko.com/en/coins/${coin.id}`;
+    row.target = '_blank'; row.rel = 'noopener';
+
+    const rank = document.createElement('span');
+    rank.className = 'market-rank';
+    rank.textContent = i + 1;
+
+    const tokenCol = document.createElement('span');
+    tokenCol.className = 'market-token';
+    const img = document.createElement('img');
+    img.src = coin.image || '';
+    img.alt = coin.symbol || '';
+    img.style.cssText = 'width:24px;height:24px;border-radius:50%;flex-shrink:0;background:var(--bg-3);object-fit:cover;';
+    img.onerror = () => { img.style.display='none'; };
+    const nameWrap = document.createElement('div');
+    nameWrap.innerHTML = `<div class="market-token-name">${escHtml(coin.name || '—')}</div><div class="market-token-sym">${escHtml((coin.symbol||'').toUpperCase())}</div>`;
+    tokenCol.append(img, nameWrap);
+
+    const mkCol = (val, cls = '') => {
+      const s = document.createElement('span');
+      s.className = `market-col r${cls ? ' ' + cls : ''}`;
+      s.textContent = val; return s;
+    };
+
+    row.append(
+      rank, tokenCol,
+      mkCol(coin.current_price ? fmt.price(coin.current_price) : '—'),
+      mkCol(chg24.text, chg24.cls),
+      mkCol(chg7d.text, chg7d.cls + ' hide-mobile'),
+      mkCol(fmt.large(coin.market_cap), 'hide-mobile'),
+      mkCol(fmt.large(coin.total_volume), 'hide-mobile'),
+    );
+    rows.appendChild(row);
+  });
+}
+
 // Market search
 let searchDebounce = null;
 const searchInput = $('market-search');
@@ -949,9 +1108,9 @@ async function runSearch(q) {
   try {
     const data  = await fetch(`/api/dex/latest/dex/search?q=${encodeURIComponent(s)}`).then(r => r.json());
     const pairs = (data?.pairs || [])
-      .filter(p => p.chainId === 'pulsechain' && (p.marketCap || p.fdv || 0) >= 5000)
+      .filter(p => (p.marketCap || p.fdv || 0) >= 1000)
       .sort((a, b) => Number(b.liquidity?.usd || 0) - Number(a.liquidity?.usd || 0))
-      .slice(0, 20);
+      .slice(0, 30);
     renderSearchResults(pairs);
   } catch (e) {
     if (searchDrop) searchDrop.innerHTML = `<div class="search-empty">Error: ${escHtml(e.message)}</div>`;
@@ -964,18 +1123,21 @@ function renderSearchResults(pairs) {
   if (!pairs.length) { searchDrop.innerHTML = '<div class="search-empty">No results found</div>'; show(searchDrop); return; }
   pairs.forEach(pair => {
     const token = pair.baseToken || {};
+    const chain = pair.chainId || 'unknown';
     const { text: chgText, cls: chgCls } = fmt.change(pair.priceChange?.h24);
     const a = document.createElement('a');
     a.className = 'search-item';
-    a.href = pair.pairAddress ? `https://dexscreener.com/pulsechain/${pair.pairAddress}` : '#';
+    a.href = pair.pairAddress ? `https://dexscreener.com/${chain}/${pair.pairAddress}` : `https://dexscreener.com/${chain}`;
     a.target = '_blank'; a.rel = 'noopener';
 
     const logo = buildLogo(API.logoUrl(pair, token.address), token.address, token.symbol, 'sm');
     logo.style.cssText = 'width:28px;height:28px;flex-shrink:0;';
 
+    const chainLabel = chain.replace('pulsechain', 'PulseChain').replace('ethereum', 'ETH').replace('bsc', 'BSC').replace('base', 'Base').replace('solana', 'SOL').replace('polygon', 'MATIC');
+
     const info = document.createElement('div');
     info.className = 'search-item-info';
-    info.innerHTML = `<div class="search-item-sym">${escHtml(token.symbol || '—')}<span class="search-item-chain" style="margin-left:.35rem">${escHtml(pair.chainId || 'pulsechain')}</span></div><div class="search-item-name">${escHtml(token.name || token.symbol || '')}</div>`;
+    info.innerHTML = `<div class="search-item-sym">${escHtml(token.symbol || '—')}<span class="search-item-chain" style="margin-left:.35rem">${escHtml(chainLabel)}</span></div><div class="search-item-name">${escHtml(token.name || token.symbol || '')}</div>`;
 
     const stats = document.createElement('div');
     stats.className = 'search-item-stats';
