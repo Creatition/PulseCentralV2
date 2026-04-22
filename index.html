@@ -65,9 +65,6 @@
         </a>
       </div>
     </div>
-    <button class="tab-btn" data-tab="ecosystem" role="tab" aria-selected="false" aria-controls="tab-ecosystem">
-      <span aria-hidden="true">🌐</span><span class="tab-label">Ecosystem</span>
-    </button>
     <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
       <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
     </button>
@@ -235,10 +232,19 @@
         <button class="btn btn-ghost btn-sm" id="crypto100-refresh-btn">↻ Refresh</button>
       </div>
       <div class="page-subtitle">Top 100 cryptocurrencies by market cap</div>
+
+      <!-- Search -->
+      <div class="market-toolbar">
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input type="search" class="input search-input" id="crypto100-search" placeholder="Search crypto by name or symbol…" autocomplete="off" spellcheck="false" aria-label="Search crypto">
+        </div>
+      </div>
+
       <div class="page-loader" id="crypto100-loading"><div class="spinner"></div><div>Fetching global market data…</div></div>
       <div class="error-banner hidden" id="crypto100-error" role="alert"></div>
       <div id="crypto100-list" class="hidden">
-        <div class="market-header crypto100-header" role="row">
+        <div class="market-header" role="row">
           <span>#</span>
           <span>Coin</span>
           <span class="r">Price</span>
@@ -426,7 +432,7 @@
       <div class="page-title" style="margin-bottom:0;">Watchlist</div>
       <span class="badge badge-neu" id="wl-count" style="font-size:.78rem;">0</span>
     </div>
-    <div class="page-subtitle">Track tokens. Star any token on Home or Markets to add it here.</div>
+    <div class="page-subtitle">Star any token on Home or Markets to add it here.</div>
 
     <!-- Add by address -->
     <div class="wl-add-bar">
@@ -444,23 +450,19 @@
       ⭐ Your watchlist is empty.<br>Star tokens on the Home or Markets tabs, or paste a contract address above.
     </div>
 
-    <!-- Table -->
-    <div class="wl-table-wrap hidden" id="wl-table-wrap">
-      <table class="wl-table" aria-label="Watchlist tokens">
-        <thead>
-          <tr>
-            <th style="width:56px;"></th>
-            <th>Token</th>
-            <th class="r">Price</th>
-            <th class="r">24h</th>
-            <th class="r hide-mobile">Volume</th>
-            <th class="r hide-mobile">Mkt Cap</th>
-            <th class="r hide-mobile">Liquidity</th>
-            <th class="r"></th>
-          </tr>
-        </thead>
-        <tbody id="wl-tbody"></tbody>
-      </table>
+    <!-- Market-style list (same as PulseChain Markets) -->
+    <div class="hidden" id="wl-table-wrap">
+      <div class="market-header" role="row">
+        <span>#</span>
+        <span>Token</span>
+        <span class="r">Price</span>
+        <span class="r">24h</span>
+        <span class="r hide-mobile">Mkt Cap</span>
+        <span class="r hide-mobile">Volume</span>
+        <span class="r hide-mobile">Liquidity</span>
+        <span class="r"></span>
+      </div>
+      <div id="wl-rows"></div>
     </div>
 
   </div>
@@ -499,94 +501,6 @@
         </iframe>
       </div>
     </div>
-
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
-     ECOSYSTEM TAB
-     ═══════════════════════════════════════════════════ -->
-<div id="tab-ecosystem" class="tab-panel" role="tabpanel">
-  <div class="page">
-    <div class="page-title">Ecosystem</div>
-    <div class="page-subtitle">PulseChain network &amp; protocol stats</div>
-
-    <div class="eco-grid">
-
-      <!-- Bridge TVL -->
-      <div class="eco-card" id="eco-bridge-full">
-        <div class="eco-card-head">
-          <span class="eco-card-icon">🌉</span>
-          <div>
-            <div class="eco-card-title">PulseChain Bridge TVL</div>
-            <div class="eco-card-desc">Locked assets Ethereum ↔ PulseChain</div>
-          </div>
-        </div>
-        <div class="eco-metrics">
-          <div class="eco-metric">
-            <div class="eco-metric-label">Current TVL</div>
-            <div class="eco-metric-value" id="eco-bridge-tvl-now">—</div>
-          </div>
-          <div class="eco-metric">
-            <div class="eco-metric-label">7d Change</div>
-            <div class="eco-metric-value" id="eco-bridge-tvl-7d">—</div>
-          </div>
-          <div class="eco-metric">
-            <div class="eco-metric-label">30d Change</div>
-            <div class="eco-metric-value" id="eco-bridge-tvl-30d">—</div>
-          </div>
-        </div>
-        <div class="eco-chart" id="eco-bridge-chart-full"></div>
-        <div class="eco-source">Source: <a href="https://defillama.com/protocol/pulsechain-bridge" target="_blank" rel="noopener">DefiLlama</a></div>
-      </div>
-
-      <!-- Fear & Greed -->
-      <div class="eco-card">
-        <div class="eco-card-head">
-          <span class="eco-card-icon">😱</span>
-          <div>
-            <div class="eco-card-title">Crypto Fear &amp; Greed</div>
-            <div class="eco-card-desc">Overall market sentiment</div>
-          </div>
-        </div>
-        <div class="eco-metrics">
-          <div class="eco-metric" style="grid-column:1/-1;">
-            <div class="eco-metric-label">Index</div>
-            <div class="eco-metric-value" id="eco-fear-value" style="font-size:1rem;">—</div>
-          </div>
-        </div>
-        <div class="eco-source">Source: <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">Alternative.me</a></div>
-      </div>
-
-      <!-- Global market -->
-      <div class="eco-card">
-        <div class="eco-card-head">
-          <span class="eco-card-icon">🌎</span>
-          <div>
-            <div class="eco-card-title">Global Crypto Market</div>
-            <div class="eco-card-desc">BTC dominance &amp; total market cap</div>
-          </div>
-        </div>
-        <div class="eco-metrics">
-          <div class="eco-metric">
-            <div class="eco-metric-label">BTC Dom</div>
-            <div class="eco-metric-value" id="eco-btc-dom">—</div>
-          </div>
-          <div class="eco-metric">
-            <div class="eco-metric-label">Total MCap</div>
-            <div class="eco-metric-value" id="eco-total-mcap">—</div>
-          </div>
-          <div class="eco-metric">
-            <div class="eco-metric-label">24h Volume</div>
-            <div class="eco-metric-value" id="eco-total-vol">—</div>
-          </div>
-        </div>
-        <div class="eco-source">Source: <a href="https://www.coingecko.com/en/global-charts" target="_blank" rel="noopener">CoinGecko</a></div>
-      </div>
-
-    </div>
-
-    <div id="eco-loading" class="page-loader" style="margin-top:2rem;"><div class="spinner"></div><div>Loading ecosystem data…</div></div>
 
   </div>
 </div>

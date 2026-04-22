@@ -24,7 +24,7 @@ const API = (() => {
   /* ── Core coins shown on Home tab ────────────────── */
   const CORE_COINS = [
     // PLS pair: WPLS/USDC on PulseX — shows PLS price in USD correctly (PLS is base token)
-    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0x6753560538eca67617a9ce605178f788be7e524e', color: '#7b2fff' },
+    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0xE56043671df55dE5CDf8459710433C10324DE0aE', color: '#7b2fff' },
     { symbol: 'PLSX', address: '0x95B303987A60C71504D99Aa1b13B4DA07b0790ab', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9', color: '#ff6d00' },
     { symbol: 'HEX',  address: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39', pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65', color: '#e8002d' },
     { symbol: 'INC',  address: '0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d', pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa', color: '#00e676' },
@@ -186,7 +186,6 @@ const API = (() => {
   /* ── Core coins (Home tab) ────────────────────────── */
 
   async function getCoreCoinPairs() {
-    // Fetch all core pair prices in one request
     const pairAddrs = CORE_COINS.map(c => c.pair).join(',');
     const [pairData, snapshots] = await Promise.all([
       get(`${DSX}/pairs/pulsechain/${pairAddrs}`).catch(() => ({})),
@@ -198,23 +197,19 @@ const API = (() => {
       if (p.pairAddress) byPair.set(p.pairAddress.toLowerCase(), p);
     }
 
-    // Fetch live bars for PLS from GeckoTerminal (WPLS/DAI pair has good history)
-    const plsCoin   = CORE_COINS[0]; // PLS
-    const plsBars   = await getChartBars(plsCoin.pair).catch(() => []);
+    // Fetch live bars for ALL core coins from GeckoTerminal (limit=1000 = ~2.7 years, covers PulseChain launch)
+    // Run in parallel — each returns full history from day 1
+    const barResults = await Promise.allSettled(
+      CORE_COINS.map(coin => getChartBars(coin.pair))
+    );
 
-    return CORE_COINS.map(coin => {
+    return CORE_COINS.map((coin, i) => {
       const pair = byPair.get(coin.pair.toLowerCase()) || null;
-      const isPls = coin.symbol === 'PLS';
-      let bars;
-      if (isPls) {
-        // Use live fetched bars, fall back to snapshot if available
-        bars = plsBars.length > 0 ? plsBars :
-          (Array.isArray(snapshots.coins?.['PLS']) ? snapshots.coins['PLS'] : []);
-      } else {
-        bars = Array.isArray(snapshots.coins?.[coin.symbol]) && snapshots.coins[coin.symbol].length >= 1
-          ? snapshots.coins[coin.symbol]
-          : [];
-      }
+      // Use live bars if we got them; fall back to snapshot
+      const liveBars = barResults[i].status === 'fulfilled' ? barResults[i].value : [];
+      const snapBars = Array.isArray(snapshots.coins?.[coin.symbol]) ? snapshots.coins[coin.symbol] : [];
+      // Pick whichever has more data
+      const bars = liveBars.length >= snapBars.length ? liveBars : snapBars;
       return { ...coin, pair, bars };
     });
   }

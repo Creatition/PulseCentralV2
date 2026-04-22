@@ -356,7 +356,7 @@ function switchTab(name) {
   if (name === 'portfolio') initPortfolioTab();
   if (name === 'watchlist') loadWatchlistTab();
   if (name === 'swap')      initSwap();
-  if (name === 'ecosystem') loadEcosystem();
+  
   if (name === 'links')     {}
 }
 
@@ -1077,6 +1077,7 @@ async function loadCrypto100(forceRefresh = false) {
     try { data = JSON.parse(text); } catch { throw new Error('Server returned non-JSON — restart the server with: npm start'); }
     if (!Array.isArray(data)) throw new Error(data?.error || 'Invalid response from server');
     hide(loading);
+    crypto100AllCoins = data;
     renderCrypto100(data);
     show(list);
   } catch (e) {
@@ -1098,7 +1099,7 @@ function renderCrypto100(coins) {
     const chg7d = fmt.change(coin.price_change_percentage_7d_in_currency);
 
     const row = document.createElement('div');
-    row.className = 'market-row crypto100-row';
+    row.className = 'market-row';
     row.style.cursor = 'pointer';
     row.onclick = () => window.open(`https://www.coingecko.com/en/coins/${coin.id}`, '_blank', 'noopener');
 
@@ -1148,6 +1149,21 @@ function renderCrypto100(coins) {
       mkCol(fmt.large(coin.total_volume), 'hide-mobile'),
     );
     rows.appendChild(row);
+  });
+}
+
+// Crypto Top 100 search filter
+let crypto100AllCoins = [];
+const c100SearchInput = $('crypto100-search');
+if (c100SearchInput) {
+  c100SearchInput.addEventListener('input', () => {
+    const q = c100SearchInput.value.trim().toLowerCase();
+    if (!q) { renderCrypto100(crypto100AllCoins); return; }
+    const filtered = crypto100AllCoins.filter(c =>
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.symbol || '').toLowerCase().includes(q)
+    );
+    renderCrypto100(filtered);
   });
 }
 
@@ -2098,62 +2114,108 @@ async function loadWatchlistTab() {
   hide(empty); show(loading); hide(wrap);
 
   try {
-    const map = await API.getPairsByAddresses(tokens.map(t => t.address));
+    // Separate on-chain tokens from CoinGecko watchlist entries
+    const onChainTokens = tokens.filter(t => !t.address.startsWith('cg:'));
+    const cgTokens      = tokens.filter(t => t.address.startsWith('cg:'));
+
+    const pairMap = onChainTokens.length
+      ? await API.getPairsByAddresses(onChainTokens.map(t => t.address))
+      : new Map();
+
+    // For CoinGecko tokens, fetch prices
+    let cgPriceMap = new Map();
+    if (cgTokens.length) {
+      try {
+        const ids = cgTokens.map(t => t.address.replace('cg:', '')).join(',');
+        const res = await fetch(`/api/coingecko/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(c => cgPriceMap.set(`cg:${c.id}`, c));
+        }
+      } catch {}
+    }
+
     hide(loading); show(wrap);
-    renderWatchlistTable(tokens, map);
+    renderWatchlistTable(tokens, pairMap, cgPriceMap);
   } catch {
     hide(loading); show(wrap);
-    renderWatchlistTable(tokens, new Map());
+    renderWatchlistTable(tokens, new Map(), new Map());
   }
 }
 
-function renderWatchlistTable(tokens, pairMap) {
-  const tbody = $('wl-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
+function renderWatchlistTable(tokens, pairMap, cgPriceMap = new Map()) {
+  const container = $('wl-rows');
+  if (!container) return;
+  container.innerHTML = '';
+
   tokens.forEach((token, idx) => {
-    const pair = pairMap.get(token.address.toLowerCase());
-    const price = Number(pair?.priceUsd || 0);
-    const { text: chgText, cls: chgCls } = fmt.change(pair?.priceChange?.h24);
-    const logo = API.logoUrl(pair, token.address) || token.logoUrl;
+    const isCG   = token.address.startsWith('cg:');
+    const pair   = isCG ? null : pairMap.get(token.address.toLowerCase());
+    const cgCoin = isCG ? cgPriceMap.get(token.address) : null;
 
-    const tr = document.createElement('tr');
-    if (pair?.pairAddress) {
-      tr.style.cursor = 'pointer';
-      tr.onclick = () => window.open(`https://dexscreener.com/pulsechain/${pair.pairAddress}`, '_blank', 'noopener');
-    }
+    // Build a unified data object
+    const price  = isCG ? (cgCoin?.current_price || 0) : Number(pair?.priceUsd || 0);
+    const chg24  = isCG ? (cgCoin?.price_change_percentage_24h || 0) : Number(pair?.priceChange?.h24 || 0);
+    const mcap   = isCG ? (cgCoin?.market_cap || 0) : (pair?.marketCap || pair?.fdv || 0);
+    const vol    = isCG ? (cgCoin?.total_volume || 0) : (pair?.volume?.h24 || 0);
+    const liq    = isCG ? 0 : (pair?.liquidity?.usd || 0);
+    const logo   = isCG ? (cgCoin?.image || token.logoUrl) : (API.logoUrl(pair, token.address) || token.logoUrl);
+    const link   = isCG
+      ? `https://www.coingecko.com/en/coins/${token.address.replace('cg:', '')}`
+      : (pair?.pairAddress ? `https://dexscreener.com/pulsechain/${pair.pairAddress}` : null);
 
-    // Move buttons
-    const tdMove = document.createElement('td');
-    tdMove.style.cssText = 'white-space:nowrap;';
-    const up = document.createElement('button'); up.className = 'wl-move-btn'; up.textContent = '▲'; up.disabled = idx === 0;
-    up.onclick = e => { e.stopPropagation(); Watchlist.moveToken(token.address, 'up'); loadWatchlistTab(); };
-    const dn = document.createElement('button'); dn.className = 'wl-move-btn'; dn.textContent = '▼'; dn.disabled = idx === tokens.length - 1;
-    dn.onclick = e => { e.stopPropagation(); Watchlist.moveToken(token.address, 'down'); loadWatchlistTab(); };
-    tdMove.append(up, dn);
+    const { text: chgText, cls: chgCls } = fmt.change(chg24);
 
-    // Token
-    const tdToken = document.createElement('td');
-    const cell = document.createElement('div'); cell.className = 'token-cell';
-    cell.append(buildLogo(logo, token.address, token.symbol), (() => { const d = document.createElement('div'); d.innerHTML = `<div class="token-cell-name">${escHtml(token.name || token.symbol)}</div><div class="token-cell-sym">${escHtml(token.symbol)}</div>`; return d; })());
-    tdToken.appendChild(cell);
+    // Build market-row style div
+    const row = document.createElement('div');
+    row.className = 'market-row';
+    if (link) { row.style.cursor = 'pointer'; row.onclick = () => window.open(link, '_blank', 'noopener'); }
 
-    const mkTd = (v, right = true, cls = '') => {
-      const td = document.createElement('td');
-      if (right) td.className = 'r'; if (cls) td.classList.add(cls);
-      td.textContent = v; return td;
+    // Rank
+    const rankEl = document.createElement('span');
+    rankEl.className = 'market-rank';
+    rankEl.textContent = idx + 1;
+
+    // Token col
+    const tokenCol = document.createElement('span');
+    tokenCol.className = 'market-token';
+    const logoEl = buildLogo(logo, isCG ? null : token.address, token.symbol, 'sm');
+    if (logoEl.tagName === 'IMG') logoEl.style.cssText = 'width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg-3);';
+    else logoEl.style.cssText = 'width:20px;height:20px;font-size:.5rem;flex-shrink:0;';
+    const nameWrap = document.createElement('div');
+    nameWrap.innerHTML = `<div class="market-token-name">${escHtml(token.name || token.symbol)}</div><div class="market-token-sym">${escHtml(token.symbol)}</div>`;
+
+    // Remove/unstar button
+    const rm = document.createElement('button');
+    rm.className = 'star-btn active';
+    rm.style.cssText = 'margin-left:.25rem;width:24px;height:24px;font-size:.8rem;';
+    rm.textContent = '★';
+    rm.title = 'Remove from watchlist';
+    rm.onclick = e => {
+      e.stopPropagation();
+      Watchlist.removeToken(token.address);
+      loadWatchlistTab();
     };
+    tokenCol.append(logoEl, nameWrap, rm);
 
-    const chgTd = document.createElement('td'); chgTd.className = 'r';
-    const cs = document.createElement('span'); cs.className = chgCls; cs.textContent = chgText; chgTd.appendChild(cs);
+    const mkCol = (val, cls = '') => {
+      const s = document.createElement('span');
+      s.className = `market-col${cls ? ' ' + cls : ''}`;
+      s.textContent = val; return s;
+    };
+    const chgCol = document.createElement('span');
+    chgCol.className = `market-col ${chgCls}`;
+    chgCol.textContent = chgText;
 
-    const rmTd = document.createElement('td'); rmTd.className = 'r';
-    const rm = document.createElement('button'); rm.className = 'wl-remove-btn'; rm.textContent = '✕';
-    rm.onclick = e => { e.stopPropagation(); Watchlist.removeToken(token.address); loadWatchlistTab(); };
-    rmTd.appendChild(rm);
-
-    tr.append(tdMove, tdToken, mkTd(price ? fmt.price(price) : '—', true, 'mono-val'), chgTd, mkTd(fmt.large(pair?.volume?.h24), true, 'mono-val'), mkTd(fmt.large(pair?.marketCap || pair?.fdv), true, 'mono-val'), mkTd(fmt.large(pair?.liquidity?.usd), true, 'mono-val'), rmTd);
-    tbody.appendChild(tr);
+    row.append(
+      rankEl, tokenCol,
+      mkCol(price ? fmt.price(price) : '—'),
+      chgCol,
+      mkCol(fmt.large(mcap), 'hide-mobile'),
+      mkCol(fmt.large(vol), 'hide-mobile'),
+      mkCol(liq ? fmt.large(liq) : '—', 'hide-mobile'),
+    );
+    container.appendChild(row);
   });
 }
 
@@ -2191,7 +2253,7 @@ function initSwap() {
     if (!libertyInited) {
       libertyInited = true;
       const iframe = $('liberty-iframe');
-      if (iframe) iframe.src = 'https://libertyswap.finance/swap';
+      if (iframe) iframe.src = 'https://libertyswap.finance/';
     }
   } else {
     if (!swapInited) {

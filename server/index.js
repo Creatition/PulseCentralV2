@@ -333,7 +333,7 @@ const SNAPSHOT_FILE = path.join(__dirname, 'data', 'chart-snapshots.json');
 
 // Coins to snapshot: PLS, PLSX, HEX, INC, PRVX
 const SNAPSHOT_COINS = [
-  { symbol: 'PLS',  pair: '0x6753560538eca67617a9ce605178f788be7e524e' }, // WPLS/USDC — PLS price in USD
+  { symbol: 'PLS',  pair: '0xE56043671df55dE5CDf8459710433C10324DE0aE' }, // WPLS/USDC — PLS price in USD
   { symbol: 'PLSX', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9' },
   { symbol: 'HEX',  pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65' },
   { symbol: 'INC',  pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa' },
