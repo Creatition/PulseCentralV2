@@ -336,13 +336,19 @@ const Alerts = (() => {
    TAB NAVIGATION
    ══════════════════════════════════════════════════════ */
 
-const tabs = document.querySelectorAll('.tab-btn:not(.modal-tab-btn)');
+// Exclude the markets dropdown-trigger from the generic tab listener
+const tabs = document.querySelectorAll('.tab-btn:not(.modal-tab-btn):not(.has-dropdown)');
 const panels = document.querySelectorAll('.tab-panel');
 let activeTab = 'home';
 
 function switchTab(name) {
   activeTab = name;
-  tabs.forEach(b => { const a = b.dataset.tab === name; b.classList.toggle('active', a); b.setAttribute('aria-selected', a); });
+  // Highlight correct nav button (including the has-dropdown one for markets)
+  document.querySelectorAll('.tab-btn:not(.modal-tab-btn)').forEach(b => {
+    const a = b.dataset.tab === name;
+    b.classList.toggle('active', a);
+    b.setAttribute('aria-selected', a);
+  });
   panels.forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
 
   if (name === 'home')      loadHome();
@@ -355,20 +361,30 @@ function switchTab(name) {
   if (name === 'links')     {}  // static
 }
 
+// Wire up all non-dropdown tabs normally
 tabs.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 qs('.logo-link')?.addEventListener('click', () => switchTab('home'));
 
-// Markets dropdown toggle
+// Markets dropdown — handled separately so it doesn't conflict
 const marketsDropWrap = document.querySelector('.tab-dropdown-wrap');
 const marketsDropMenu = document.getElementById('markets-dropdown');
-if (marketsDropWrap && marketsDropMenu) {
-  marketsDropWrap.querySelector('.tab-btn')?.addEventListener('click', (e) => {
+const marketsBtn      = marketsDropWrap?.querySelector('.tab-btn.has-dropdown');
+
+if (marketsBtn && marketsDropMenu) {
+  marketsBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    // Switch to markets tab
     switchTab('markets');
-    marketsDropMenu.classList.toggle('open');
+    // Toggle the dropdown open/closed
+    const isOpen = marketsDropMenu.classList.contains('open');
+    marketsDropMenu.classList.toggle('open', !isOpen);
   });
-  document.addEventListener('click', () => marketsDropMenu.classList.remove('open'));
+
+  // Clicking a dropdown item closes the menu
   marketsDropMenu.addEventListener('click', e => e.stopPropagation());
+
+  // Clicking anywhere else closes it
+  document.addEventListener('click', () => marketsDropMenu.classList.remove('open'));
 }
 
 let activeMarketsSubtab = 'pulsechain';

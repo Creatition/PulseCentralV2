@@ -1167,42 +1167,55 @@ input, select, textarea { font-family: var(--font); }
 /* ── Markets dropdown nav ────────────────────────────── */
 .tab-dropdown-wrap {
   position: relative;
+  display: inline-flex;
 }
 .has-dropdown .dropdown-arrow {
-  font-size: .65rem;
-  margin-left: .2rem;
-  opacity: .6;
+  font-size: .6rem;
+  margin-left: .25rem;
+  opacity: .7;
   transition: transform .2s;
+  display: inline-block;
 }
 .tab-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 180px;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 195px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.35);
-  z-index: 200;
+  box-shadow: 0 12px 32px rgba(0,0,0,.45);
+  z-index: 9999;
   overflow: hidden;
+  animation: dropdownIn .15s ease;
+}
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .tab-dropdown.open { display: block; }
+.tab-dropdown.open ~ .tab-btn .dropdown-arrow,
+.has-dropdown.active .dropdown-arrow { transform: rotate(180deg); }
 .tab-dropdown-item {
   display: flex;
   align-items: center;
-  gap: .5rem;
+  gap: .55rem;
   width: 100%;
-  padding: .65rem 1rem;
-  font-size: .82rem;
+  padding: .7rem 1.1rem;
+  font-size: .84rem;
   font-weight: 500;
   color: var(--text-2);
   background: none;
   border: none;
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
   text-align: left;
-  transition: background .1s, color .1s;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
 }
+.tab-dropdown-item:last-child { border-bottom: none; }
 .tab-dropdown-item:hover { background: var(--bg-2); color: var(--text); }
 .tab-dropdown-item.active-sub {
   color: var(--primary);
