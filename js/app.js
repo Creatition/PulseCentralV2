@@ -382,7 +382,8 @@ function switchMarketsSubtab(subtab) {
     btn.classList.toggle('active-sub', btn.dataset.subtab === subtab);
   });
   if (marketsDropMenu) marketsDropMenu.classList.remove('open');
-  if (subtab === 'crypto100') loadCrypto100();
+  if (subtab === 'crypto100')   loadCrypto100();
+  if (subtab === 'commodities') loadCommodities();
 }
 window.switchMarketsSubtab = switchMarketsSubtab;
 
@@ -1019,13 +1020,15 @@ $('markets-refresh-btn')?.addEventListener('click', () => { marketLoaded = false
 
 let crypto100Loaded = false;
 
-async function loadCrypto100() {
-  if (crypto100Loaded) return;
+async function loadCrypto100(forceRefresh = false) {
+  if (crypto100Loaded && !forceRefresh) return;
   crypto100Loaded = true;
   const loading = $('crypto100-loading');
   const error   = $('crypto100-error');
   const list    = $('crypto100-list');
+  const btn     = $('crypto100-refresh-btn');
   show(loading); hide(error); hide(list);
+  if (btn) { btn.disabled = true; btn.textContent = '↻ …'; }
   try {
     const data = await fetch('/api/coingecko/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d').then(r => r.json());
     if (!Array.isArray(data)) throw new Error('Invalid response from CoinGecko');
@@ -1035,8 +1038,12 @@ async function loadCrypto100() {
   } catch (e) {
     hide(loading);
     if (error) { error.textContent = `Failed: ${e.message}`; show(error); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
   }
 }
+
+$('crypto100-refresh-btn')?.addEventListener('click', () => loadCrypto100(true));
 
 function renderCrypto100(coins) {
   const rows = $('crypto100-rows');
@@ -1080,6 +1087,162 @@ function renderCrypto100(coins) {
       mkCol(fmt.large(coin.total_volume), 'hide-mobile'),
     );
     rows.appendChild(row);
+  });
+}
+
+/* ── Commodities ───────────────────────────────────── */
+
+// Static commodity data with live prices via open APIs
+const COMMODITIES = [
+  // Energy
+  { id: 'CL=F',  name: 'WTI Crude Oil',    symbol: 'WTI',    unit: '/bbl',  category: 'Energy',      icon: '🛢️',  color: '#8B4513' },
+  { id: 'BZ=F',  name: 'Brent Crude Oil',   symbol: 'BRENT',  unit: '/bbl',  category: 'Energy',      icon: '🛢️',  color: '#A0522D' },
+  { id: 'NG=F',  name: 'Natural Gas',       symbol: 'NATGAS', unit: '/MMBtu',category: 'Energy',      icon: '🔥',  color: '#FF8C00' },
+  { id: 'RB=F',  name: 'RBOB Gasoline',     symbol: 'GAS',    unit: '/gal',  category: 'Energy',      icon: '⛽',  color: '#DC143C' },
+  // Metals
+  { id: 'GC=F',  name: 'Gold',              symbol: 'GOLD',   unit: '/oz',   category: 'Metals',      icon: '🥇',  color: '#FFD700' },
+  { id: 'SI=F',  name: 'Silver',            symbol: 'SILVER', unit: '/oz',   category: 'Metals',      icon: '🥈',  color: '#C0C0C0' },
+  { id: 'PL=F',  name: 'Platinum',          symbol: 'PLAT',   unit: '/oz',   category: 'Metals',      icon: '💎',  color: '#E5E4E2' },
+  { id: 'PA=F',  name: 'Palladium',         symbol: 'PALL',   unit: '/oz',   category: 'Metals',      icon: '⚗️',  color: '#B4A7D6' },
+  { id: 'HG=F',  name: 'Copper',            symbol: 'COPPER', unit: '/lb',   category: 'Metals',      icon: '🔶',  color: '#B87333' },
+  // Agriculture
+  { id: 'ZW=F',  name: 'Wheat',             symbol: 'WHEAT',  unit: '/bu',   category: 'Agriculture', icon: '🌾',  color: '#DAA520' },
+  { id: 'ZC=F',  name: 'Corn',              symbol: 'CORN',   unit: '/bu',   category: 'Agriculture', icon: '🌽',  color: '#F4D03F' },
+  { id: 'ZS=F',  name: 'Soybeans',          symbol: 'SOY',    unit: '/bu',   category: 'Agriculture', icon: '🫘',  color: '#6B8E23' },
+  { id: 'CC=F',  name: 'Cocoa',             symbol: 'COCOA',  unit: '/t',    category: 'Agriculture', icon: '🍫',  color: '#5C3317' },
+  { id: 'KC=F',  name: 'Coffee',            symbol: 'COFFEE', unit: '/lb',   category: 'Agriculture', icon: '☕',  color: '#6F4E37' },
+  { id: 'CT=F',  name: 'Cotton',            symbol: 'COTTON', unit: '/lb',   category: 'Agriculture', icon: '🌿',  color: '#F5F5DC' },
+  { id: 'SB=F',  name: 'Sugar',             symbol: 'SUGAR',  unit: '/lb',   category: 'Agriculture', icon: '🍬',  color: '#FF69B4' },
+  // Livestock
+  { id: 'LE=F',  name: 'Live Cattle',       symbol: 'CATTLE', unit: '/lb',   category: 'Livestock',   icon: '🐄',  color: '#8B4513' },
+  { id: 'GF=F',  name: 'Feeder Cattle',     symbol: 'FCAT',   unit: '/lb',   category: 'Livestock',   icon: '🐂',  color: '#A0522D' },
+  { id: 'HE=F',  name: 'Lean Hogs',         symbol: 'HOGS',   unit: '/lb',   category: 'Livestock',   icon: '🐷',  color: '#FFB6C1' },
+  // Timber
+  { id: 'LBS=F', name: 'Lumber',            symbol: 'LUMBER', unit: '/MBF',  category: 'Timber',      icon: '🪵',  color: '#8B6914' },
+  // Other
+  { id: 'OJ=F',  name: 'Orange Juice',      symbol: 'OJ',     unit: '/lb',   category: 'Agriculture', icon: '🍊',  color: '#FF8C00' },
+  { id: 'ZL=F',  name: 'Soybean Oil',       symbol: 'SOYO',   unit: '/lb',   category: 'Agriculture', icon: '🫙',  color: '#9ACD32' },
+];
+
+let commoditiesLoaded = false;
+let commodityData = [];
+let commoditiesAutoTimer = null;
+
+async function loadCommodities(forceRefresh = false) {
+  if (commoditiesLoaded && !forceRefresh) return;
+  commoditiesLoaded = true;
+  const loading = $('commodities-loading');
+  const error   = $('commodities-error');
+  const list    = $('commodities-list');
+  const btn     = $('commodities-refresh-btn');
+  const ts      = $('commodities-timestamp');
+  show(loading); hide(error); hide(list);
+  if (btn) { btn.disabled = true; btn.textContent = '↻ …'; }
+
+  try {
+    const symbols = COMMODITIES.map(c => c.id).join(',');
+    const data = await fetch(`/api/commodities?symbols=${encodeURIComponent(symbols)}`).then(r => r.json());
+
+    commodityData = COMMODITIES.map(c => {
+      const q = data[c.id] || {};
+      return {
+        ...c,
+        price:      q.price      || null,
+        change:     q.change     || 0,
+        changePct:  q.changePct  || 0,
+        prevClose:  q.prevClose  || null,
+        high52w:    q.high52w    || null,
+        low52w:     q.low52w     || null,
+        lastUpdate: q.lastUpdate || null,
+      };
+    });
+
+    hide(loading);
+    renderCommodities(commodityData);
+    show(list);
+    if (ts) ts.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+    // Auto-refresh every 60s while this subtab is active
+    clearInterval(commoditiesAutoTimer);
+    commoditiesAutoTimer = setInterval(() => {
+      if (activeMarketsSubtab === 'commodities') loadCommodities(true);
+    }, 60_000);
+
+  } catch (e) {
+    hide(loading);
+    if (error) { error.textContent = `Failed to load commodity prices: ${e.message}`; show(error); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
+}
+
+$('commodities-refresh-btn')?.addEventListener('click', () => loadCommodities(true));
+
+function renderCommodities(data) {
+  const list = $('commodities-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Group by category
+  const categories = {};
+  data.forEach(c => {
+    if (!categories[c.category]) categories[c.category] = [];
+    categories[c.category].push(c);
+  });
+
+  const catOrder = ['Energy', 'Metals', 'Agriculture', 'Livestock', 'Timber'];
+  catOrder.forEach(cat => {
+    if (!categories[cat]) return;
+    const section = document.createElement('div');
+    section.className = 'commodity-section';
+
+    const title = document.createElement('div');
+    title.className = 'commodity-section-title';
+    title.textContent = cat;
+    section.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'commodity-grid';
+
+    categories[cat].forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'commodity-card';
+      const chg = fmt.change(c.changePct);
+
+      const priceStr = c.price != null
+        ? (c.price >= 1000
+            ? '$' + c.price.toLocaleString('en-US', { maximumFractionDigits: 2 })
+            : '$' + c.price.toFixed(c.price >= 10 ? 2 : 4))
+        : '—';
+
+      const chgStr = c.changePct !== 0
+        ? `${c.changePct >= 0 ? '+' : ''}${c.changePct.toFixed(2)}%`
+        : '—';
+
+      const absChgStr = c.change !== 0
+        ? `${c.change >= 0 ? '+' : ''}${c.change >= 1 ? c.change.toFixed(2) : c.change.toFixed(4)}`
+        : '';
+
+      card.innerHTML = `
+        <div class="commodity-card-head">
+          <span class="commodity-icon" style="color:${c.color}">${c.icon}</span>
+          <div class="commodity-name-wrap">
+            <div class="commodity-name">${escHtml(c.name)}</div>
+            <div class="commodity-sym">${escHtml(c.symbol)} <span style="color:var(--text-3);font-size:.65rem">${escHtml(c.unit)}</span></div>
+          </div>
+        </div>
+        <div class="commodity-price">${priceStr}</div>
+        <div class="commodity-change-row">
+          <span class="${chg.cls}" style="font-size:.82rem;font-weight:600">${chgStr}</span>
+          ${absChgStr ? `<span style="font-size:.72rem;color:var(--text-3)">${escHtml(absChgStr)}</span>` : ''}
+        </div>
+        ${c.high52w && c.low52w ? `<div class="commodity-range"><span class="commodity-range-label">52w</span><span>${escHtml('$' + Number(c.low52w).toFixed(2))} – ${escHtml('$' + Number(c.high52w).toFixed(2))}</span></div>` : ''}
+      `;
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    list.appendChild(section);
   });
 }
 
@@ -1350,11 +1513,10 @@ async function loadPortfolio(address) {
     const toggleBtn = $('add-wallet-toggle');
     if (toggleBtn) { toggleBtn.textContent = '+ Add Wallet'; toggleBtn.setAttribute('aria-expanded', 'false'); }
 
-    // History snapshot for saved wallets
-    if (Watchlist.hasWallet(address)) {
-      History.add(address.toLowerCase(), sumUsd, sumPls);
-      renderHistoryChart(address.toLowerCase());
-    }
+    // Always record history snapshot and show chart (for all wallets, not just saved)
+    const historyKey = address.toLowerCase();
+    History.add(historyKey, sumUsd, sumPls);
+    renderHistoryChart(historyKey);
 
     updateSaveBtn();
     renderSavedWallets();
@@ -1425,10 +1587,11 @@ async function loadGroupPortfolio(group) {
     hide($('portfolio-empty'));
     ['portfolio-summary','portfolio-table-wrap','portfolio-pie'].forEach(id => show($(id)));
 
-    // Group history
+    // Group history — always record and display
     const hKey = 'group:' + group.id;
     History.add(hKey, sumUsd, sumPls);
     renderHistoryChart(hKey);
+    show($('portfolio-history'));
 
     // Show group banner
     const banner = $('group-banner');
@@ -1578,7 +1741,12 @@ function buildPortfolioRow(idx, token, balance, price, change24h, pairAddr, supp
   const tr = document.createElement('tr');
   tr.onclick = () => { if (pairAddr) window.open(`https://dexscreener.com/pulsechain/${pairAddr}`, '_blank', 'noopener'); };
 
-  const tdIdx = document.createElement('td'); tdIdx.textContent = idx; tdIdx.style.color = 'var(--text-3)'; tdIdx.style.fontSize = '.78rem';
+  // Styled rank badge
+  const tdIdx = document.createElement('td');
+  const rankBadge = document.createElement('span');
+  rankBadge.className = `portfolio-rank${idx === 1 ? ' top1' : idx === 2 ? ' top2' : idx === 3 ? ' top3' : ''}`;
+  rankBadge.textContent = idx === 1 ? '🥇' : idx === 2 ? '🥈' : idx === 3 ? '🥉' : String(idx);
+  tdIdx.appendChild(rankBadge);
 
   const tdToken = document.createElement('td');
   const cell = document.createElement('div'); cell.className = 'token-cell';
@@ -1626,8 +1794,47 @@ function renderHistoryChart(key) {
   const section = $('portfolio-history');
   if (!section) return;
   const history = History.get(key);
-  if (history.length < 2) { hide(section); return; }
+
+  // Always show the section — even with 1 data point, show a helpful state
   show(section);
+
+  if (history.length === 0) {
+    // No data at all — hide
+    hide(section);
+    return;
+  }
+
+  if (history.length === 1) {
+    // Only today's snapshot — show a friendly "building" message
+    const svgEl = $('history-svg');
+    if (svgEl) svgEl.innerHTML = '';
+    const overlay = $('history-overlay');
+    const tooltip = $('history-tooltip');
+    if (overlay) overlay.onmousemove = null;
+    if (tooltip) hide(tooltip);
+
+    // Show a placeholder message inside the chart area
+    const existing = section.querySelector('.history-building-msg');
+    if (existing) existing.remove();
+    const msg = document.createElement('div');
+    msg.className = 'history-building-msg';
+    const val = histCurrency === 'usd'
+      ? '$' + Number(history[0].usd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : Number(history[0].pls || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' PLS';
+    msg.innerHTML = `
+      <div class="history-building-icon">📈</div>
+      <div class="history-building-title">Chart is building</div>
+      <div class="history-building-sub">Today's value: <strong>${escHtml(val)}</strong></div>
+      <div class="history-building-sub" style="margin-top:.25rem">Load again tomorrow to start seeing your portfolio history chart grow day by day.</div>
+    `;
+    const chartWrap = section.querySelector('.history-chart-wrap');
+    if (chartWrap) chartWrap.appendChild(msg);
+    return;
+  }
+
+  // 2+ data points — remove any placeholder message and draw the chart
+  const existing = section.querySelector('.history-building-msg');
+  if (existing) existing.remove();
   drawHistoryChart(history);
 }
 

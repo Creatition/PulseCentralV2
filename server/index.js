@@ -192,6 +192,51 @@ app.get('/api/coingecko/markets', (req, res) => {
   proxy(res, `https://api.coingecko.com/api/v3/coins/markets?${params}`);
 });
 
+// ── Commodities via Yahoo Finance (unofficial JSON endpoint) ─
+app.get('/api/commodities', async (req, res) => {
+  const rawSymbols = (req.query.symbols || '').split(',').filter(Boolean);
+  if (!rawSymbols.length) return res.json({});
+
+  const cacheKey = 'commodities:' + rawSymbols.sort().join(',');
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
+
+  const result = {};
+
+  await Promise.allSettled(rawSymbols.map(async symbol => {
+    try {
+      // Yahoo Finance v8 chart endpoint — works without auth
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)',
+          'Accept': 'application/json',
+          'Origin': 'https://finance.yahoo.com',
+          'Referer': 'https://finance.yahoo.com/',
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta) return;
+
+      const price      = meta.regularMarketPrice ?? null;
+      const prevClose  = meta.chartPreviousClose ?? meta.previousClose ?? null;
+      const change     = (price != null && prevClose != null) ? price - prevClose : 0;
+      const changePct  = (price != null && prevClose != null && prevClose !== 0) ? ((price - prevClose) / prevClose) * 100 : 0;
+      const high52w    = meta.fiftyTwoWeekHigh   ?? null;
+      const low52w     = meta.fiftyTwoWeekLow    ?? null;
+
+      result[symbol] = { price, prevClose, change, changePct, high52w, low52w, lastUpdate: Date.now() };
+    } catch { /* skip failed symbols */ }
+  }));
+
+  // Cache for 60 seconds (commodity prices update infrequently)
+  cache.set(cacheKey, { d: result, t: Date.now() - (TTL - 60_000) });
+  res.json(result);
+});
+
 /* ── Weekly chart snapshot (served from disk cache) ───── */
 // Server pre-builds weekly OHLCV snapshots using GeckoTerminal
 // so the browser doesn't have to fetch large datasets on every load.

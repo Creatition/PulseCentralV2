@@ -35,6 +35,9 @@
         <button class="tab-dropdown-item" data-subtab="crypto100" onclick="switchMarketsSubtab('crypto100')">
           🌐 Crypto Top 100
         </button>
+        <button class="tab-dropdown-item" data-subtab="commodities" onclick="switchMarketsSubtab('commodities')">
+          🪙 Commodities
+        </button>
       </div>
     </div>
     <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio">
@@ -221,7 +224,10 @@
 
     <!-- Sub-tab: Crypto Top 100 -->
     <div id="markets-sub-crypto100" class="markets-subtab hidden">
-      <div class="page-title">Crypto Top 100</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.25rem;">
+        <div class="page-title" style="margin-bottom:0">Crypto Top 100</div>
+        <button class="btn btn-ghost btn-sm" id="crypto100-refresh-btn">↻ Refresh</button>
+      </div>
       <div class="page-subtitle">Top 100 cryptocurrencies by market cap</div>
       <div class="page-loader" id="crypto100-loading"><div class="spinner"></div><div>Fetching global market data…</div></div>
       <div class="error-banner hidden" id="crypto100-error" role="alert"></div>
@@ -236,6 +242,23 @@
           <span class="r hide-mobile">Volume 24h</span>
         </div>
         <div id="crypto100-rows"></div>
+      </div>
+    </div>
+
+    <!-- Sub-tab: Commodities -->
+    <div id="markets-sub-commodities" class="markets-subtab hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.25rem;">
+        <div class="page-title" style="margin-bottom:0">Commodities</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <span id="commodities-timestamp" style="font-size:.72rem;color:var(--text-3);"></span>
+          <button class="btn btn-ghost btn-sm" id="commodities-refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="page-subtitle">Live commodity prices — Energy, Metals, Agriculture &amp; more</div>
+      <div class="page-loader" id="commodities-loading"><div class="spinner"></div><div>Fetching commodity prices…</div></div>
+      <div class="error-banner hidden" id="commodities-error" role="alert"></div>
+      <div id="commodities-list" class="hidden">
+        <!-- Populated by JS -->
       </div>
     </div>
 
