@@ -1543,7 +1543,7 @@ a.commodity-card:hover {
   background: var(--bg-2);
   border: 1px solid var(--border);
   cursor: default;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .nav-stat { color: var(--text); font-family: var(--mono); letter-spacing: -.01em; font-size: .82rem; }
 .nav-stat-sep { color: var(--border-light); }
@@ -1552,6 +1552,7 @@ a.commodity-card:hover {
   background: none;
   padding: 0;
   cursor: default;
+  pointer-events: auto;
 }
 .tab-btn[data-tab="markets-stats"]:hover { background: none; }
 .tab-btn[data-tab="markets-stats"].active { background: none; color: inherit; }
@@ -1592,28 +1593,44 @@ a.commodity-card:hover {
 .nav-stat-tip {
   position: relative;
   cursor: default;
+  pointer-events: auto;
 }
 .nav-stat-tip::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bg-1);
+  background: var(--bg-0, #09090f);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
-  padding: .3rem .6rem;
-  font-size: .72rem;
+  padding: .35rem .7rem;
+  font-size: .75rem;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  box-shadow: 0 6px 20px rgba(0,0,0,.6);
   opacity: 0;
   pointer-events: none;
-  transition: opacity .15s;
-  z-index: 9999;
+  transition: opacity .18s;
+  z-index: 99999;
 }
-.nav-stat-tip:hover::after {
+/* Arrow pointing up */
+.nav-stat-tip::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: var(--border-light);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s;
+  z-index: 99999;
+}
+.nav-stat-tip:hover::after,
+.nav-stat-tip:hover::before {
   opacity: 1;
 }
 
@@ -1652,3 +1669,49 @@ a.commodity-card:hover {
 #wl-rows .market-row .star-btn {
   width: 24px; height: 24px; font-size: .85rem;
 }
+
+/* ── LibertySwap Bridge UI ──────────────────────────── */
+.liberty-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: .5rem;
+}
+.liberty-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+}
+.liberty-card-title {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--primary);
+  margin-bottom: .6rem;
+}
+.liberty-routes { display: flex; flex-direction: column; gap: .5rem; }
+.liberty-route-group { padding: .4rem 0; border-bottom: 1px solid var(--border); }
+.liberty-route-group:last-child { border-bottom: none; }
+.liberty-route-label { font-weight: 700; font-size: .82rem; color: var(--text); margin-bottom: .15rem; }
+.liberty-route-desc  { font-size: .75rem; color: var(--text-2); }
+.liberty-fee-table, .liberty-limits { display: flex; flex-direction: column; gap: .35rem; }
+.liberty-fee-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .8rem; color: var(--text-2); padding: .2rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.liberty-fee-row:last-child { border-bottom: none; }
+.liberty-fee-val { font-weight: 700; color: var(--text); font-family: var(--mono); }
+.lib-positive { color: var(--green, #00e676) !important; }
+.liberty-quote-card { grid-column: span 1; }
+.liberty-quote-form { display: flex; flex-direction: column; gap: .5rem; }
+.liberty-form-row { display: flex; flex-direction: column; gap: .2rem; }
+.liberty-label { font-size: .72rem; color: var(--text-2); font-weight: 600; }
+.liberty-quote-out { display: flex; flex-direction: column; gap: .2rem; margin-top: .5rem; padding: .75rem; background: var(--bg-2); border-radius: var(--radius-sm); }
+.liberty-router-list { display: flex; flex-direction: column; gap: .3rem; }
+.liberty-router-row { display: flex; justify-content: space-between; align-items: center; font-size: .75rem; padding: .2rem 0; border-bottom: 1px solid var(--border); }
+.liberty-router-row:last-child { border-bottom: none; }
+.liberty-router-chain { color: var(--text-2); font-size: .72rem; }
+.liberty-router-addr { color: var(--text-3); font-size: .65rem; font-family: var(--mono); }

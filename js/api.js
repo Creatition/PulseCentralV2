@@ -163,14 +163,20 @@ const API = (() => {
 
   /**
    * Fetch daily OHLCV bars from GeckoTerminal.
-   * Returns bars with time in MILLISECONDS, sorted oldest→newest.
-   * invertPrices: set true when pool has quote=WPLS and base=stablecoin,
-   * so we get PLS price (1/close) instead of stablecoin price.
+   * currency=usd: GeckoTerminal returns the BASE token price in USD.
+   * For the WPLS/DAI pool (E56043), DAI is the base token, so close ≈ $1.
+   * Setting invertPrices=true inverts to get WPLS (PLS) price in USD.
    */
   async function getChartBars(pairAddress, invertPrices = false) {
-    const url  = `${GECKO}/${pairAddress}/ohlcv/day?aggregate=1&limit=1000&currency=usd`;
+    // Fetch WITHOUT currency=usd so we get the raw pool ratio (token0/token1 price)
+    // For WPLS/DAI pool: this gives us WPLS price in DAI, which ≈ PLS price in USD
+    const url = invertPrices
+      ? `${GECKO}/${pairAddress}/ohlcv/day?aggregate=1&limit=1000`
+      : `${GECKO}/${pairAddress}/ohlcv/day?aggregate=1&limit=1000&currency=usd`;
+
     const data = await get(url, 15000);
     const raw  = data?.data?.attributes?.ohlcv_list || [];
+
     const bars = raw
       .map(b => ({
         time:   b[0] > 1e10 ? b[0] : b[0] * 1000,
@@ -185,19 +191,32 @@ const API = (() => {
 
     if (!invertPrices) return bars;
 
-    // When DAI/stablecoin is the base token, close ≈ 1 (DAI price in USD).
-    // Invert to get WPLS price: PLS_USD = 1 / (WPLS_per_DAI)
-    // GeckoTerminal ohlcv with currency=usd for a DAI/WPLS pool returns close in USD of the base (DAI)
-    // but the actual ratio field gives us DAI-per-WPLS. We want WPLS-per-DAI → invert.
+    // Without currency=usd, GeckoTerminal returns token0/token1 ratio.
+    // For WPLS/DAI pool where DAI is token0 and WPLS is token1:
+    //   close = price of DAI expressed in WPLS units (e.g. 10000 = 1 DAI costs 10000 WPLS)
+    //   So PLS price in USD = 1 / close
+    // For WPLS/DAI where WPLS is token0 and DAI is token1:
+    //   close = price of WPLS in DAI (e.g. 0.0001 = 1 WPLS costs 0.0001 DAI)
+    //   This is already PLS price in USD, no inversion needed
+
+    // Detect orientation by checking if close values look like PLS price (< 1) or DAI/WPLS ratio (> 100)
+    const medianClose = bars[Math.floor(bars.length / 2)]?.close || 0;
+    const needsInvert = medianClose > 10; // if close > 10, it's DAI-per-WPLS count, invert it
+
+    if (!needsInvert) {
+      // close already represents PLS price in DAI (which ≈ PLS price in USD)
+      return bars.filter(b => b.close > 0 && b.close < 1);
+    }
+
     return bars
       .map(b => ({
         ...b,
         open:  b.open  > 0 ? 1 / b.open  : 0,
-        high:  b.low   > 0 ? 1 / b.low   : 0,   // inverted: low becomes high
-        low:   b.high  > 0 ? 1 / b.high  : 0,   // inverted: high becomes low
+        high:  b.low   > 0 ? 1 / b.low   : 0,
+        low:   b.high  > 0 ? 1 / b.high  : 0,
         close: b.close > 0 ? 1 / b.close : 0,
       }))
-      .filter(b => b.close > 0 && b.close < 1); // PLS < $1 sanity check
+      .filter(b => b.close > 0 && b.close < 1);
   }
 
   /* ── Core coins (Home tab) ────────────────────────── */

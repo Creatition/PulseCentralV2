@@ -2247,60 +2247,105 @@ async function addWatchlistToken() {
    ══════════════════════════════════════════════════════ */
 
 let swapInited = false;
-let libertyInited = false;
-let libertyStatsLoaded = false;
 
-async function loadLibertyStats(force = false) {
-  if (libertyStatsLoaded && !force) return;
-  libertyStatsLoaded = true;
-  const errEl = $('liberty-error');
+// LibertySwap: cross-chain bridge with quote API
+// API docs: https://docs.libertyswap.finance/resources/liberty-swap-api
+// Base URL: https://api.libertyswap.finance   Version: v1
+// Endpoint: GET /v1/quote?srcToken=USDC&dstToken=USDC&srcChain=8453&dstChain=369&amount=...
+
+const LIBERTY_ROUTERS = new Set([
+  '0xe7ee706a6708b691a232452c9cb267d186942f09', // PulseChain USDC
+  '0x80c2c603d72ea17a0d85b670d4489eb3012035cd', // PulseChain WETH
+  '0x06291eee038e94e8dec2b3bfb6e030c0b5615506', // Ethereum USDC
+  '0x12352b55e0b4305dd83a349a5d7845be9b5a2eea', // Ethereum USDT
+  '0xaa7a195d69327a894eeb969d3bcb89116fc78a14', // Ethereum DAI
+  '0x60fdaf9198efcd6faf27d50e955e1a42905f2eeb', // Ethereum ETH
+  '0x43f403972080406e3e6602793a5072dbc4389bab', // BSC USDC
+  '0xc438d51f296ff3e53d061293d2bc4bb9fb2f7f19', // BSC USDT
+  '0x4e839da8dcd61df10976b926cbf9ab7d06bff072', // BSC USD1
+  '0xefb11856c4be75c276a5c9e286f8032d3e16ced2', // Base USDC
+  '0x05216280d45bb8e8dcb863186e4762090bab7b6f', // Arbitrum USDC
+  '0xcb2b2a70f29a8b7467fa930a09f9271d1ef0e5a9', // Polygon USDC
+]);
+
+// Token decimals for amount conversion
+const LIBERTY_DECIMALS = { USDC: 6, ETH: 18, WETH: 18, USDT: 6, DAI: 18, USD1: 18 };
+
+async function fetchLibertyQuote() {
+  const srcChain = $('lib-src-chain')?.value;
+  const dstChain = $('lib-dst-chain')?.value;
+  const token    = $('lib-token')?.value;
+  const amount   = parseFloat($('lib-amount')?.value);
+
+  const errEl     = $('lib-quote-error');
+  const resultEl  = $('lib-quote-result');
+  const loadingEl = $('lib-quote-loading');
+
   if (errEl) hide(errEl);
+  if (resultEl) hide(resultEl);
+
+  if (!amount || isNaN(amount) || amount <= 0) {
+    if (errEl) { errEl.textContent = 'Please enter an amount'; show(errEl); } return;
+  }
+  if (srcChain === dstChain) {
+    if (errEl) { errEl.textContent = 'Source and destination chains must be different'; show(errEl); } return;
+  }
+
+  show(loadingEl);
+
   try {
-    // Try common LibertySwap API endpoints
-    const [statsRes, poolsRes] = await Promise.allSettled([
-      fetch('/api/libertyswap/v1/stats').then(r => r.json()).catch(() => null),
-      fetch('/api/libertyswap/v1/pools').then(r => r.json()).catch(() => null),
-    ]);
+    const decimals  = LIBERTY_DECIMALS[token] || 6;
+    const amountWei = BigInt(Math.round(amount * 10 ** decimals)).toString();
+    // Destination token: ETH/WETH maps to WETH on PulseChain, else same symbol
+    const dstToken  = (token === 'ETH' && dstChain === '369') ? 'WETH' : token;
+    const srcToken  = token;
 
-    const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
-    const pools = poolsRes.status === 'fulfilled' ? poolsRes.value : null;
+    const qs = new URLSearchParams({ srcToken, dstToken, amount: amountWei, srcChain, dstChain });
+    const res = await fetch(`/api/libertyswap/v1/quote?${qs}`);
+    const data = await res.json();
 
-    const setVal = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+    hide(loadingEl);
 
-    if (stats && !stats.error) {
-      setVal('lib-tvl',   stats.tvlUSD   ? fmt.large(stats.tvlUSD)   : (stats.tvl   ? fmt.large(stats.tvl)   : '—'));
-      setVal('lib-vol',   stats.volumeUSD ? fmt.large(stats.volumeUSD) : (stats.volume24h ? fmt.large(stats.volume24h) : '—'));
-      setVal('lib-fees',  stats.feesUSD  ? fmt.large(stats.feesUSD)  : (stats.fees24h  ? fmt.large(stats.fees24h)  : '—'));
+    if (data.error || data.message) {
+      if (errEl) { errEl.textContent = data.error || data.message; show(errEl); } return;
     }
-    if (pools && !pools.error) {
-      const poolCount = Array.isArray(pools) ? pools.length : (pools.pools?.length || pools.count || '—');
-      setVal('lib-pools', poolCount);
-      setVal('lib-pairs', poolCount);
-    }
+
+    // Security: verify router address
+    const routerAddr = (data.to || '').toLowerCase();
+    const isVerified = LIBERTY_ROUTERS.has(routerAddr);
+
+    const srcAmt  = data.srcAmount  ? (Number(data.srcAmount)  / 10 ** (data.srcToken?.decimals  || decimals)).toFixed(4) : '—';
+    const dstAmt  = data.destAmount ? (Number(data.destAmount) / 10 ** (data.destToken?.decimals || decimals)).toFixed(4) : '—';
+    const feePct  = data.fee?.percentage ? `${data.fee.percentage}%` : '—';
+    const feeAmt  = data.fee?.amount ? (Number(data.fee.amount) / 10 ** decimals).toFixed(4) : '—';
+
+    const setText = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+    setText('lib-q-send',    `${srcAmt} ${data.srcToken?.symbol || srcToken}`);
+    setText('lib-q-recv',    `${dstAmt} ${data.destToken?.symbol || dstToken}`);
+    setText('lib-q-fee-pct', feePct);
+    setText('lib-q-fee-amt', `${feeAmt} ${data.srcToken?.symbol || srcToken}`);
+    setText('lib-q-router',  isVerified ? `✓ ${data.to}` : `⚠ UNVERIFIED: ${data.to}`);
+
+    const routerEl = $('lib-q-router');
+    if (routerEl) routerEl.style.color = isVerified ? 'var(--green)' : 'var(--red)';
+
+    show(resultEl);
   } catch (e) {
-    const errEl = $('liberty-error');
-    if (errEl) { errEl.textContent = `Stats unavailable: ${e.message}`; show(errEl); }
+    hide(loadingEl);
+    if (errEl) { errEl.textContent = `Quote failed: ${e.message}`; show(errEl); }
   }
 }
 
-$('liberty-refresh-btn')?.addEventListener('click', () => { libertyStatsLoaded = false; loadLibertyStats(true); });
+$('lib-quote-btn')?.addEventListener('click', fetchLibertyQuote);
 
 function initSwap() {
-  if (activeSwapSubtab === 'libertyswap') {
-    if (!libertyInited) {
-      libertyInited = true;
-      const iframe = $('liberty-iframe');
-      if (iframe) iframe.src = 'https://libertyswap.finance/';
-    }
-    loadLibertyStats();
-  } else {
-    if (!swapInited) {
-      swapInited = true;
-      const iframe = $('swap-iframe');
-      if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
-    }
+  if (!swapInited) {
+    swapInited = true;
+    const iframe = $('swap-iframe');
+    if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
   }
 }
+
 
 /* ══════════════════════════════════════════════════════
    TRADE LOG TAB

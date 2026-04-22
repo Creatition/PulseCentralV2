@@ -368,8 +368,10 @@ function getMondayMs() {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysBack);
 }
 
-async function fetchGeckoBars(pairAddress) {
-  const url = `https://api.geckoterminal.com/api/v2/networks/pulsechain/pools/${pairAddress}/ohlcv/day?aggregate=1&limit=1000&currency=usd`;
+async function fetchGeckoBars(pairAddress, invertPrices = false) {
+  const url = invertPrices
+    ? `https://api.geckoterminal.com/api/v2/networks/pulsechain/pools/${pairAddress}/ohlcv/day?aggregate=1&limit=1000`
+    : `https://api.geckoterminal.com/api/v2/networks/pulsechain/pools/${pairAddress}/ohlcv/day?aggregate=1&limit=1000&currency=usd`;
   const r = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json; version=20230302' },
     signal: AbortSignal.timeout(20_000),
@@ -377,7 +379,7 @@ async function fetchGeckoBars(pairAddress) {
   if (!r.ok) throw new Error(`GeckoTerminal HTTP ${r.status}`);
   const data = await r.json();
   const raw  = data?.data?.attributes?.ohlcv_list || [];
-  return raw
+  const bars = raw
     .map(b => ({
       time:   b[0] > 1e10 ? b[0] : b[0] * 1000,
       open:   Number(b[1] || 0),
@@ -388,6 +390,23 @@ async function fetchGeckoBars(pairAddress) {
     }))
     .filter(b => b.time > 0 && b.close > 0)
     .sort((a, b) => a.time - b.time);
+
+  if (!invertPrices) return bars;
+
+  // Auto-detect: if median close > 10, prices are in "DAI per WPLS" units → invert to get PLS price
+  const medianClose = bars[Math.floor(bars.length / 2)]?.close || 0;
+  if (medianClose > 10) {
+    return bars
+      .map(b => ({
+        ...b,
+        open:  b.open  > 0 ? 1 / b.open  : 0,
+        high:  b.low   > 0 ? 1 / b.low   : 0,
+        low:   b.high  > 0 ? 1 / b.high  : 0,
+        close: b.close > 0 ? 1 / b.close : 0,
+      }))
+      .filter(b => b.close > 0 && b.close < 1);
+  }
+  return bars.filter(b => b.close > 0 && b.close < 1);
 }
 
 let snapshotCache = null;
@@ -413,19 +432,8 @@ async function buildSnapshot() {
   const coins    = {};
   await Promise.all(SNAPSHOT_COINS.map(async ({ symbol, pair }) => {
     try {
-      let bars = await fetchGeckoBars(pair);
-      // PLS pair (E56043) has DAI as base token — invert to get PLS price in USD
-      if (symbol === 'PLS') {
-        bars = bars
-          .map(b => ({
-            ...b,
-            open:  b.open  > 0 ? 1 / b.open  : 0,
-            high:  b.low   > 0 ? 1 / b.low   : 0,
-            low:   b.high  > 0 ? 1 / b.high  : 0,
-            close: b.close > 0 ? 1 / b.close : 0,
-          }))
-          .filter(b => b.close > 0 && b.close < 1);
-      }
+      // Pass invertPrices=true for PLS (WPLS/DAI pool, need raw ratio)
+      const bars = await fetchGeckoBars(pair, symbol === 'PLS');
       coins[symbol] = bars;
       console.log(`[snapshot] ${symbol}: ${coins[symbol].length} bars`);
     } catch (err) {
