@@ -1092,34 +1092,34 @@ function renderCrypto100(coins) {
 /* ── Commodities ───────────────────────────────────── */
 
 // Static commodity data with live prices via open APIs
-// Commodities list — cgId = CoinGecko ID for tokens that track real commodity prices
-// Items with cgId will get live prices; others show a link to view on TradingView
+// Commodities — cgId = CoinGecko ID for tokens tracking real commodity prices
+// tvSym = TradingView symbol for chart link (shown on ALL cards)
 const COMMODITIES = [
-  // Metals — all have liquid on-chain tokens tracked by CoinGecko
-  { id: 'GC=F',  cgId: 'pax-gold',           name: 'Gold',           symbol: 'XAU',    unit: '/oz',    category: 'Metals',      icon: '🥇', color: '#FFD700', tvSym: 'GOLD' },
-  { id: 'SI=F',  cgId: 'silver',              name: 'Silver',         symbol: 'XAG',    unit: '/oz',    category: 'Metals',      icon: '🥈', color: '#C0C0C0', tvSym: 'SILVER' },
-  { id: 'PL=F',  cgId: 'platinum',            name: 'Platinum',       symbol: 'PLAT',   unit: '/oz',    category: 'Metals',      icon: '💎', color: '#E5E4E2', tvSym: 'PLATINUM' },
-  { id: 'HG=F',  cgId: 'copper',              name: 'Copper',         symbol: 'COPPER', unit: '/lb',    category: 'Metals',      icon: '🔶', color: '#B87333', tvSym: 'COPPER' },
+  // Metals — have on-chain backed tokens tracked by CoinGecko
+  { id: 'GC=F',  cgId: 'pax-gold',    name: 'Gold',           symbol: 'XAU',    unit: '/oz',    category: 'Metals',      icon: '🥇', color: '#FFD700', tvSym: 'TVC:GOLD' },
+  { id: 'SI=F',  cgId: 'silvercoin',  name: 'Silver',         symbol: 'XAG',    unit: '/oz',    category: 'Metals',      icon: '🥈', color: '#C0C0C0', tvSym: 'TVC:SILVER' },
+  { id: 'PL=F',  cgId: 'platinum',    name: 'Platinum',       symbol: 'PLAT',   unit: '/oz',    category: 'Metals',      icon: '💎', color: '#E5E4E2', tvSym: 'TVC:PLAT' },
+  { id: 'HG=F',  cgId: null,          name: 'Copper',         symbol: 'COPPER', unit: '/lb',    category: 'Metals',      icon: '🔶', color: '#B87333', tvSym: 'COMEX:HG1!' },
   // Energy
-  { id: 'CL=F',  cgId: 'crude-oil-token',     name: 'WTI Crude Oil',  symbol: 'WTI',    unit: '/bbl',   category: 'Energy',      icon: '🛢️', color: '#8B4513', tvSym: 'USOIL' },
-  { id: 'NG=F',  cgId: 'natural-gas',         name: 'Natural Gas',    symbol: 'NATGAS', unit: '/MMBtu', category: 'Energy',      icon: '🔥', color: '#FF8C00', tvSym: 'NATGAS' },
-  { id: 'BZ=F',  cgId: null,                  name: 'Brent Crude',    symbol: 'BRENT',  unit: '/bbl',   category: 'Energy',      icon: '🛢️', color: '#A0522D', tvSym: 'UKOIL' },
-  { id: 'RB=F',  cgId: null,                  name: 'RBOB Gasoline',  symbol: 'GAS',    unit: '/gal',   category: 'Energy',      icon: '⛽', color: '#DC143C', tvSym: 'GASOLINE' },
+  { id: 'CL=F',  cgId: null,          name: 'WTI Crude Oil',  symbol: 'WTI',    unit: '/bbl',   category: 'Energy',      icon: '🛢️', color: '#8B4513', tvSym: 'TVC:USOIL' },
+  { id: 'BZ=F',  cgId: null,          name: 'Brent Crude',    symbol: 'BRENT',  unit: '/bbl',   category: 'Energy',      icon: '🛢️', color: '#A0522D', tvSym: 'TVC:UKOIL' },
+  { id: 'NG=F',  cgId: null,          name: 'Natural Gas',    symbol: 'NATGAS', unit: '/MMBtu', category: 'Energy',      icon: '🔥', color: '#FF8C00', tvSym: 'TVC:NATGAS' },
+  { id: 'RB=F',  cgId: null,          name: 'RBOB Gasoline',  symbol: 'GAS',    unit: '/gal',   category: 'Energy',      icon: '⛽', color: '#DC143C', tvSym: 'NYMEX:RB1!' },
   // Agriculture
-  { id: 'ZW=F',  cgId: null,                  name: 'Wheat',          symbol: 'WHEAT',  unit: '/bu',    category: 'Agriculture', icon: '🌾', color: '#DAA520', tvSym: 'WHEAT' },
-  { id: 'ZC=F',  cgId: null,                  name: 'Corn',           symbol: 'CORN',   unit: '/bu',    category: 'Agriculture', icon: '🌽', color: '#F4D03F', tvSym: 'CORN' },
-  { id: 'ZS=F',  cgId: null,                  name: 'Soybeans',       symbol: 'SOY',    unit: '/bu',    category: 'Agriculture', icon: '🫘', color: '#6B8E23', tvSym: 'SOYBEAN' },
-  { id: 'CC=F',  cgId: null,                  name: 'Cocoa',          symbol: 'COCOA',  unit: '/t',     category: 'Agriculture', icon: '🍫', color: '#5C3317', tvSym: 'COCOA' },
-  { id: 'KC=F',  cgId: null,                  name: 'Coffee',         symbol: 'COFFEE', unit: '/lb',    category: 'Agriculture', icon: '☕', color: '#6F4E37', tvSym: 'COFFEE' },
-  { id: 'CT=F',  cgId: null,                  name: 'Cotton',         symbol: 'COTTON', unit: '/lb',    category: 'Agriculture', icon: '🌿', color: '#F5F5DC', tvSym: 'COTTON' },
-  { id: 'SB=F',  cgId: null,                  name: 'Sugar',          symbol: 'SUGAR',  unit: '/lb',    category: 'Agriculture', icon: '🍬', color: '#FF69B4', tvSym: 'SUGAR' },
-  { id: 'OJ=F',  cgId: null,                  name: 'Orange Juice',   symbol: 'OJ',     unit: '/lb',    category: 'Agriculture', icon: '🍊', color: '#FF8C00', tvSym: 'OJ' },
+  { id: 'ZW=F',  cgId: null,          name: 'Wheat',          symbol: 'WHEAT',  unit: '/bu',    category: 'Agriculture', icon: '🌾', color: '#DAA520', tvSym: 'CBOT:ZW1!' },
+  { id: 'ZC=F',  cgId: null,          name: 'Corn',           symbol: 'CORN',   unit: '/bu',    category: 'Agriculture', icon: '🌽', color: '#F4D03F', tvSym: 'CBOT:ZC1!' },
+  { id: 'ZS=F',  cgId: null,          name: 'Soybeans',       symbol: 'SOY',    unit: '/bu',    category: 'Agriculture', icon: '🫘', color: '#6B8E23', tvSym: 'CBOT:ZS1!' },
+  { id: 'CC=F',  cgId: null,          name: 'Cocoa',          symbol: 'COCOA',  unit: '/t',     category: 'Agriculture', icon: '🍫', color: '#5C3317', tvSym: 'ICEUS:CC1!' },
+  { id: 'KC=F',  cgId: null,          name: 'Coffee',         symbol: 'COFFEE', unit: '/lb',    category: 'Agriculture', icon: '☕', color: '#6F4E37', tvSym: 'ICEUS:KC1!' },
+  { id: 'CT=F',  cgId: null,          name: 'Cotton',         symbol: 'COTTON', unit: '/lb',    category: 'Agriculture', icon: '🌿', color: '#F5F5DC', tvSym: 'ICEUS:CT1!' },
+  { id: 'SB=F',  cgId: null,          name: 'Sugar',          symbol: 'SUGAR',  unit: '/lb',    category: 'Agriculture', icon: '🍬', color: '#FF69B4', tvSym: 'ICEUS:SB1!' },
+  { id: 'OJ=F',  cgId: null,          name: 'Orange Juice',   symbol: 'OJ',     unit: '/lb',    category: 'Agriculture', icon: '🍊', color: '#FF8C00', tvSym: 'ICEUS:OJ1!' },
   // Livestock
-  { id: 'LE=F',  cgId: null,                  name: 'Live Cattle',    symbol: 'CATTLE', unit: '/lb',    category: 'Livestock',   icon: '🐄', color: '#8B4513', tvSym: 'CATTLE' },
-  { id: 'GF=F',  cgId: null,                  name: 'Feeder Cattle',  symbol: 'FCAT',   unit: '/lb',    category: 'Livestock',   icon: '🐂', color: '#A0522D', tvSym: 'FEEDER' },
-  { id: 'HE=F',  cgId: null,                  name: 'Lean Hogs',      symbol: 'HOGS',   unit: '/lb',    category: 'Livestock',   icon: '🐷', color: '#FFB6C1', tvSym: 'LEAN HOGS' },
+  { id: 'LE=F',  cgId: null,          name: 'Live Cattle',    symbol: 'CATTLE', unit: '/lb',    category: 'Livestock',   icon: '🐄', color: '#8B4513', tvSym: 'CME:LE1!' },
+  { id: 'GF=F',  cgId: null,          name: 'Feeder Cattle',  symbol: 'FCAT',   unit: '/lb',    category: 'Livestock',   icon: '🐂', color: '#A0522D', tvSym: 'CME:GF1!' },
+  { id: 'HE=F',  cgId: null,          name: 'Lean Hogs',      symbol: 'HOGS',   unit: '/lb',    category: 'Livestock',   icon: '🐷', color: '#FFB6C1', tvSym: 'CME:HE1!' },
   // Timber
-  { id: 'LBS=F', cgId: null,                  name: 'Lumber',         symbol: 'LUMBER', unit: '/MBF',   category: 'Timber',      icon: '🪵', color: '#8B6914', tvSym: 'LUMBER' },
+  { id: 'LBS=F', cgId: null,          name: 'Lumber',         symbol: 'LUMBER', unit: '/MBF',   category: 'Timber',      icon: '🪵', color: '#8B6914', tvSym: 'CME:LBR1!' },
 ];
 
 let commoditiesLoaded = false;
@@ -1138,28 +1138,23 @@ async function loadCommodities(forceRefresh = false) {
   if (btn) { btn.disabled = true; btn.textContent = '↻ …'; }
 
   try {
-    // Use CoinGecko (already working) to fetch prices for commodities that have on-chain tokens
-    const cgIds = COMMODITIES.filter(c => c.cgId).map(c => c.cgId).join(',');
-    const res  = await fetch(`/api/coingecko/markets?vs_currency=usd&ids=${encodeURIComponent(cgIds)}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`);
+    // Fetch from our dedicated commodities endpoint (uses CoinGecko internally)
+    const res  = await fetch('/api/commodities');
     const text = await res.text();
-    let cgCoins = [];
-    try { cgCoins = JSON.parse(text); } catch { cgCoins = []; }
-    if (!Array.isArray(cgCoins)) cgCoins = [];
-
-    // Build lookup by cgId
-    const cgMap = {};
-    cgCoins.forEach(c => { cgMap[c.id] = c; });
+    let data = {};
+    try { data = JSON.parse(text); } catch { data = {}; }
+    if (data.error) throw new Error(data.error);
 
     // Merge live prices into commodity list
     commodityData = COMMODITIES.map(c => {
-      if (!c.cgId || !cgMap[c.cgId]) return { ...c, price: null, change: 0, changePct: 0 };
-      const cg = cgMap[c.cgId];
+      const q = data[c.id];
+      if (!q) return { ...c, price: null, change: 0, changePct: 0 };
       return {
         ...c,
-        price:      cg.current_price || null,
-        change:     cg.price_change_24h || 0,
-        changePct:  cg.price_change_percentage_24h || 0,
-        image:      cg.image || null,
+        price:      q.price || null,
+        change:     q.change || 0,
+        changePct:  q.changePct || 0,
+        image:      q.image || null,
         lastUpdate: Date.now(),
       };
     });
@@ -1212,7 +1207,7 @@ function renderCommodities(data) {
     categories[cat].forEach(c => {
       const hasLive = c.price !== null && c.price !== undefined;
       const chg = fmt.change(c.changePct);
-      const tvUrl = `https://www.tradingview.com/symbols/${encodeURIComponent(c.tvSym || c.symbol)}/`;
+      const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(c.tvSym || c.symbol)}`;
 
       const priceStr = hasLive
         ? (c.price >= 1000
@@ -1228,14 +1223,10 @@ function renderCommodities(data) {
         ? `${c.change >= 0 ? '+' : ''}${Math.abs(c.change) >= 1 ? c.change.toFixed(2) : c.change.toFixed(4)}`
         : null;
 
-      const card = document.createElement(hasLive ? 'div' : 'a');
+      const card = document.createElement('div');
       card.className = 'commodity-card';
-      if (!hasLive) {
-        card.href = tvUrl;
-        card.target = '_blank';
-        card.rel = 'noopener';
-        card.title = `View ${c.name} chart on TradingView`;
-      }
+      card.style.cursor = 'pointer';
+      card.onclick = () => window.open(tvUrl, '_blank', 'noopener');
 
       card.innerHTML = `
         <div class="commodity-card-head">
@@ -1244,6 +1235,7 @@ function renderCommodities(data) {
             <div class="commodity-name">${escHtml(c.name)}</div>
             <div class="commodity-sym">${escHtml(c.symbol)} <span style="color:var(--text-3);font-size:.65rem">${escHtml(c.unit)}</span></div>
           </div>
+          <a href="${escHtml(tvUrl)}" target="_blank" rel="noopener" class="commodity-tv-link" onclick="event.stopPropagation()" title="View chart on TradingView">📈</a>
         </div>
         ${hasLive ? `
           <div class="commodity-price">${priceStr}</div>
@@ -1252,7 +1244,7 @@ function renderCommodities(data) {
             ${absChgStr ? `<span style="font-size:.72rem;color:var(--text-3);margin-left:.25rem">${escHtml(absChgStr)}</span>` : ''}
           </div>
         ` : `
-          <div class="commodity-price" style="font-size:.85rem;color:var(--primary)">📈 View live chart</div>
+          <div class="commodity-price" style="font-size:.85rem;color:var(--text-2)">Click to view chart</div>
           <div class="commodity-change-row" style="font-size:.72rem;color:var(--text-3)">Opens TradingView ↗</div>
         `}
       `;

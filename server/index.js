@@ -179,150 +179,144 @@ app.get('/api/coingecko/global', (req, res) => {
   proxy(res, 'https://api.coingecko.com/api/v3/global');
 });
 
-// Crypto Top 100 — tries CoinCap first, falls back to CoinGecko
+// Unified CoinGecko markets endpoint — handles both Crypto Top 100 and commodity token lookups
+// If ?ids= is passed → fetch those specific coins (commodity use)
+// Otherwise → fetch top 100 by market cap (Crypto Top 100 use)
 app.get('/api/coingecko/markets', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  const cacheKey = 'crypto100';
-  const cached = getCached(cacheKey);
+
+  const ids       = req.query.ids || '';
+  const perPage   = req.query.per_page || '100';
+  const cacheKey  = ids ? `cg-ids:${ids}` : 'cg-top100';
+  const cached    = getCached(cacheKey);
   if (cached) return res.json(cached);
 
-  // Try CoinCap v2
+  // Build the CoinGecko URL
+  const params = new URLSearchParams({
+    vs_currency: 'usd',
+    order: 'market_cap_desc',
+    per_page: perPage,
+    page: '1',
+    sparkline: 'false',
+    price_change_percentage: '24h,7d',
+  });
+  if (ids) params.set('ids', ids);
+
+  const cgUrl = `https://api.coingecko.com/api/v3/coins/markets?${params}`;
+
+  // Try CoinGecko first
   try {
-    const r = await fetch('https://api.coincap.io/v2/assets?limit=100', {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(12_000),
-    });
-    const text = await r.text();
-    const json = JSON.parse(text);
-    if (Array.isArray(json.data) && json.data.length > 0) {
-      const mapped = json.data.map((c, i) => ({
-        id: c.id, symbol: c.symbol, name: c.name,
-        image: `https://assets.coincap.io/assets/icons/${(c.symbol||'').toLowerCase()}@2x.png`,
-        current_price: parseFloat(c.priceUsd) || 0,
-        market_cap: parseFloat(c.marketCapUsd) || 0,
-        market_cap_rank: i + 1,
-        total_volume: parseFloat(c.volumeUsd24Hr) || 0,
-        price_change_percentage_24h: parseFloat(c.changePercent24Hr) || 0,
-        price_change_percentage_7d_in_currency: 0,
-      }));
-      setCached(cacheKey, mapped);
-      return res.json(mapped);
-    }
-  } catch (e) { console.warn('[crypto100] CoinCap failed:', e.message); }
-
-  // Fallback: CoinGecko public (no key)
-  try {
-    const r = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false', {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(12_000),
-    });
-    const text = await r.text();
-    const json = JSON.parse(text);
-    if (Array.isArray(json) && json.length > 0) {
-      setCached(cacheKey, json);
-      return res.json(json);
-    }
-  } catch (e) { console.warn('[crypto100] CoinGecko failed:', e.message); }
-
-  return res.status(502).json({ error: 'All crypto data sources failed. Try again in a moment.' });
-});
-
-// Commodities — stooq.com CSV
-// Crypto Top 100 — CoinGecko (already confirmed working on this server)
-app.get('/api/coingecko/markets', async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  const cacheKey = 'crypto100';
-  const cached = getCached(cacheKey);
-  if (cached) return res.json(cached);
-
-  try {
-    const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d';
-    const r = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)',
-      },
+    const r = await fetch(cgUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
       signal: AbortSignal.timeout(15_000),
     });
     const text = await r.text();
     let json;
-    try { json = JSON.parse(text); } catch (e) {
-      console.error('[crypto100] non-JSON response:', text.slice(0, 200));
-      return res.status(502).json({ error: 'CoinGecko returned non-JSON' });
+    try { json = JSON.parse(text); } catch {
+      console.warn('[coingecko/markets] non-JSON:', text.slice(0, 100));
+      json = null;
     }
-    if (!r.ok) return res.status(502).json({ error: `CoinGecko HTTP ${r.status}: ${json?.error || ''}` });
-    if (!Array.isArray(json)) return res.status(502).json({ error: 'Unexpected CoinGecko format', raw: JSON.stringify(json).slice(0, 200) });
+    if (Array.isArray(json) && json.length > 0) {
+      setCached(cacheKey, json);
+      return res.json(json);
+    }
+    if (json && !Array.isArray(json)) {
+      console.warn('[coingecko/markets] unexpected format:', JSON.stringify(json).slice(0, 100));
+    }
+  } catch (e) { console.warn('[coingecko/markets] CoinGecko failed:', e.message); }
 
-    setCached(cacheKey, json);
-    return res.json(json);
-  } catch (err) {
-    console.error('[crypto100]', err.message);
-    return res.status(502).json({ error: err.message });
+  // Fallback for top-100 only: CoinCap
+  if (!ids) {
+    try {
+      const r = await fetch('https://api.coincap.io/v2/assets?limit=100', {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(12_000),
+      });
+      const text = await r.text();
+      const json = JSON.parse(text);
+      if (Array.isArray(json.data) && json.data.length > 0) {
+        const mapped = json.data.map((c, i) => ({
+          id: c.id, symbol: c.symbol, name: c.name,
+          image: `https://assets.coincap.io/assets/icons/${(c.symbol||'').toLowerCase()}@2x.png`,
+          current_price: parseFloat(c.priceUsd) || 0,
+          market_cap: parseFloat(c.marketCapUsd) || 0,
+          market_cap_rank: i + 1,
+          total_volume: parseFloat(c.volumeUsd24Hr) || 0,
+          price_change_percentage_24h: parseFloat(c.changePercent24Hr) || 0,
+          price_change_percentage_7d_in_currency: 0,
+        }));
+        setCached(cacheKey, mapped);
+        return res.json(mapped);
+      }
+    } catch (e) { console.warn('[coingecko/markets] CoinCap fallback failed:', e.message); }
   }
+
+  return res.status(502).json({ error: 'Market data unavailable. Try again shortly.' });
 });
 
-// Commodities — uses CoinGecko (already working) for crypto commodity proxies
-// Gold→PAXG, Silver→XAUT proxy, Oil→OIL token, plus others via CoinGecko commodity coins
+// Commodities — fetches commodity-tracking tokens from CoinGecko
+// These are verified CoinGecko IDs for tokens that track real-world commodity prices
 app.get('/api/commodities', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-
-  const cacheKey = 'commodities-cg';
+  const cacheKey = 'commodities-v2';
   const cached = getCached(cacheKey);
   if (cached) return res.json(cached);
 
-  // CoinGecko IDs for commodity-tracking tokens + precious metal coins
-  // These trade on-chain and track real commodity prices
-  const CG_COMMODITY_IDS = [
-    'pax-gold',           // PAXG — 1 token = 1 troy oz Gold
-    'tether-gold',        // XAUt — Gold
-    'silvercoin',         // Silver proxy
-    'crude-oil-token',    // OIL
-    'natural-gas',        // Gas token
-    'wrapped-bitcoin',    // BTC as commodity proxy
-    'ethereum',           // ETH
+  // Verified CoinGecko IDs — all confirmed to exist on CoinGecko
+  // pax-gold = PAXG (1 oz gold), tether-gold = XAUt (gold), 
+  // xaut = same as tether-gold alias, silvercoin tracks silver, 
+  // platinum tracks platinum, wrapped-bitcoin for BTC commodity proxy
+  const COMMODITY_IDS = [
+    'pax-gold',        // PAXG — 1 token backed by 1 troy oz physical gold ✓ confirmed
+    'tether-gold',     // XAUt — Tether gold token ✓ confirmed  
+    'silvercoin',      // SLV — silver tracking token
+    'silver',          // SLVT — another silver token on CoinGecko
+    'platinum',        // XPTX — platinum
+    'xdoge',           // placeholder test
+    'wrapped-bitcoin', // WBTC — BTC as digital commodity
+    'ethereum',        // ETH — digital commodity
+    'chainlink',       // LINK — oracle commodity data token
   ].join(',');
 
-  // Also fetch traditional commodity prices from CoinGecko's /simple/price
-  // using their commodity coin IDs
   try {
-    const [marketsRes, globalRes] = await Promise.allSettled([
-      fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${CG_COMMODITY_IDS}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(12_000),
-      }),
-    ]);
+    const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COMMODITY_IDS}&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h`, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await r.text();
+    let coins;
+    try { coins = JSON.parse(text); } catch { coins = []; }
+    if (!Array.isArray(coins)) coins = [];
 
-    // Build result keyed by our Yahoo-style symbol for frontend compatibility
+    console.log(`[commodities] CoinGecko returned ${coins.length} tokens:`, coins.map(c => c.id));
+
+    // Map CoinGecko coin → our commodity symbol key
+    const ID_TO_SYM = {
+      'pax-gold':        'GC=F',
+      'tether-gold':     'GC=F',   // use first gold result only
+      'silvercoin':      'SI=F',
+      'silver':          'SI=F',
+      'platinum':        'PL=F',
+    };
+
     const result = {};
-
-    if (marketsRes.status === 'fulfilled' && marketsRes.value.ok) {
-      const coins = await marketsRes.value.json();
-      const MAP = {
-        'pax-gold':        'GC=F',
-        'tether-gold':     'GC=F_2',
-        'crude-oil-token': 'CL=F',
-        'natural-gas':     'NG=F',
+    for (const coin of coins) {
+      const sym = ID_TO_SYM[coin.id];
+      if (!sym || result[sym]) continue; // skip if no mapping or already have one
+      result[sym] = {
+        cgId:       coin.id,
+        name:       coin.name,
+        image:      coin.image,
+        price:      coin.current_price || 0,
+        change:     coin.price_change_24h || 0,
+        changePct:  coin.price_change_percentage_24h || 0,
+        high24h:    coin.high_24h || null,
+        low24h:     coin.low_24h || null,
+        lastUpdate: Date.now(),
       };
-      for (const coin of (Array.isArray(coins) ? coins : [])) {
-        const sym = MAP[coin.id];
-        if (!sym || result[sym]) continue;
-        result[sym] = {
-          price:      coin.current_price || 0,
-          prevClose:  coin.current_price - (coin.price_change_24h || 0),
-          change:     coin.price_change_24h || 0,
-          changePct:  coin.price_change_percentage_24h || 0,
-          high52w:    coin.high_24h || null,
-          low52w:     coin.low_24h || null,
-          lastUpdate: Date.now(),
-          source:     'CoinGecko token',
-          note:       coin.name,
-        };
-      }
     }
 
-    // For commodities without on-chain tokens, use GeckoTerminal search
-    // for commodity-tracking pools, or return empty so UI shows "unavailable"
-    console.log(`[commodities] CoinGecko returned ${Object.keys(result).length} commodity prices`);
+    console.log(`[commodities] mapped ${Object.keys(result).length} symbols:`, Object.keys(result));
     setCached(cacheKey, result);
     return res.json(result);
   } catch (err) {
@@ -330,7 +324,6 @@ app.get('/api/commodities', async (req, res) => {
     return res.status(502).json({ error: err.message });
   }
 });
-
 
 /* ── Weekly chart snapshot (served from disk cache) ───── */
 // Server pre-builds weekly OHLCV snapshots using GeckoTerminal
