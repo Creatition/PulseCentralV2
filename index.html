@@ -1,1074 +1,832 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="PulseCentral – Track your PulseChain portfolio, market prices, and top token movers." />
-  <title>PulseCentral – PulseChain Portfolio Tracker</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PulseCentral — PulseChain portfolio tracker and market dashboard">
+  <title>PulseCentral</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
-  <!-- ===== HEADER ===== -->
-  <header class="site-header">
-    <div class="header-inner">
-      <div class="logo" role="button" tabindex="0" title="Home" aria-label="PulseCentral — Home">
-        <!-- Central Park-inspired logo mark -->
-        <svg class="logo-icon" viewBox="0 0 44 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <!-- Trees -->
-          <ellipse cx="8"  cy="21" rx="7"   ry="8.5" class="logo-tree-dark"/>
-          <ellipse cx="22" cy="17" rx="9"   ry="10"  class="logo-tree-mid"/>
-          <ellipse cx="36" cy="21" rx="7"   ry="8.5" class="logo-tree-dark"/>
-          <!-- Tree highlights -->
-          <ellipse cx="7"  cy="18" rx="3.5" ry="4.5" class="logo-tree-light"/>
-          <ellipse cx="21" cy="14" rx="5"   ry="5.5" class="logo-tree-light"/>
-          <ellipse cx="35" cy="18" rx="3.5" ry="4.5" class="logo-tree-light"/>
-          <!-- Pulse line: left half (primary) -->
-          <polyline class="logo-pulse-left"
-            points="1,30 6,30 9,23 13,35 17,26 22,32"
-            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <!-- Pulse line: right half (accent) -->
-          <polyline class="logo-pulse-right"
-            points="22,32 27,30 35,30 38,23 41,35 43,30"
-            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </svg>
-        <span class="logo-pulse">Pulse</span><span class="logo-central">Central</span>
-      </div>
-      <nav class="tab-nav" role="tablist" aria-label="Main navigation">
-        <!-- Markets tab with hover dropdown -->
-        <div class="tab-nav-item has-dropdown" id="markets-nav-item">
-          <button class="tab-btn" data-tab="markets" role="tab" aria-selected="false" aria-controls="tab-markets" aria-haspopup="true">
-            <span class="tab-icon">📊</span> Markets <span class="tab-caret" aria-hidden="true">▾</span>
-          </button>
-          <div class="tab-dropdown" role="menu" aria-label="Markets options">
-            <button class="tab-dropdown-item active" role="menuitem" data-markets-page="pls-top50">
-              <span class="tab-dropdown-icon">💜</span> PLS Markets
-            </button>
-            <button class="tab-dropdown-item" role="menuitem" data-markets-page="memes">
-              <span class="tab-dropdown-icon">🐸</span> Memes
-            </button>
-          </div>
-        </div>
-        <!-- Swap tab with hover dropdown -->
-        <div class="tab-nav-item has-dropdown" id="swap-nav-item">
-          <button class="tab-btn" data-tab="swap" role="tab" aria-selected="false" aria-controls="tab-swap" aria-haspopup="true">
-            <span class="tab-icon">🔄</span> Swap <span class="tab-caret" aria-hidden="true">▾</span>
-          </button>
-          <div class="tab-dropdown" role="menu" aria-label="Swap options">
-            <button class="tab-dropdown-item active" role="menuitem" data-swap-dex="pulsex">
-              <span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0x95b303987a60c71504d99aa1b13b4da07b0790ab.png" alt="PLSX logo" loading="lazy"></span> PulseX
-            </button>
-            <a class="tab-dropdown-item" role="menuitem" href="https://libertyswap.finance/" target="_blank" rel="noopener noreferrer">
-              <span class="tab-dropdown-icon"><img src="https://libertyswap.finance/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🗽'" alt="Liberty Swap logo" loading="lazy"></span> Liberty Swap ↗
-            </a>
-            <a class="tab-dropdown-item" role="menuitem" href="https://app.provex.com/" target="_blank" rel="noopener noreferrer">
-              <span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xf6f8db0aba00007681f8faf16a0fda1c9b030b11.png" alt="PRVX logo" loading="lazy"></span> ProveX ↗
-            </a>
-            <a class="tab-dropdown-item" role="menuitem" href="https://pump.tires/" target="_blank" rel="noopener noreferrer">
-              <span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xec4252e62c6de3d655ca9ce3afc12e553ebba274.png" onerror="this.style.display='none'" alt="pump.tires logo" loading="lazy"></span> pump.tires ↗
-            </a>
-          </div>
-        </div>
-        <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio">
-          <span class="tab-icon">💼</span> Portfolio
-        </button>
-        <!-- Links tab with flyout category submenus -->
-        <div class="tab-nav-item has-dropdown" id="links-nav-item">
-          <button class="tab-btn" data-tab="links" role="tab" aria-selected="false" aria-controls="tab-links" aria-haspopup="true">
-            <span class="tab-icon">🔗</span> Links <span class="tab-caret" aria-hidden="true">▾</span>
-          </button>
-          <div class="tab-dropdown links-tab-dropdown" role="menu" aria-label="Links categories">
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">📊</span> Analytics <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Analytics links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dexscreener.com/favicon.png" alt="DexScreener logo" loading="lazy"></span> DexScreener ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://www.dextools.io/app/en/pulse/pairs" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon">📊</span> DexTools ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://www.geckoterminal.com/pulsechain/pools" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://www.geckoterminal.com/favicon.ico" alt="GeckoTerminal logo" loading="lazy"></span> GeckoTerminal ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🔀</span> Aggregators <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Aggregators links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://x.libertyswap.finance/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://libertyswap.finance/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🗽'" alt="Liberty Swap logo" loading="lazy"></span> Liberty Swap ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://9x.9mm.pro/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://9mm.pro/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🔢'" alt="9x by 9mm logo" loading="lazy"></span> 9x by 9mm ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://swap.internetmoney.io/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://swap.internetmoney.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='💰'" alt="Internet Money Swap logo" loading="lazy"></span> Internet Money Swap ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.piteas.io/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://app.piteas.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='⚡'" alt="Piteas logo" loading="lazy"></span> Piteas ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://swap.win/0x9b059cdacd851359cf0e41a366e68ea661146abc" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://swap.win/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🏆'" alt="Swap.win logo" loading="lazy"></span> Swap.win ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🔍</span> Block Explorers <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Block Explorers links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://scan.pulsechain.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xa1077a294dde1b09bb078844df40758a5d0f9a27.png" alt="PulseChain Scan logo" loading="lazy"></span> PulseChain Scan ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://scan.gigatheminter.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://scan.gigatheminter.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🔎'" alt="Giga The Minter logo" loading="lazy"></span> Giga The Minter ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://midgard.wtf/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://midgard.wtf/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🌐'" alt="Midgard logo" loading="lazy"></span> Midgard ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://otherscan.pulsechain.box/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://otherscan.pulsechain.box/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='📦'" alt="OtherScan logo" loading="lazy"></span> OtherScan ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://otter.pulsechain.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://otter.pulsechain.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🦦'" alt="OtterScan logo" loading="lazy"></span> OtterScan ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🌉</span> Bridges <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Bridges links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://bridge.pulsechain.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xa1077a294dde1b09bb078844df40758a5d0f9a27.png" alt="PulseChain Bridge logo" loading="lazy"></span> PulseChain Bridge ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://libertyswap.finance/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://libertyswap.finance/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🗽'" alt="Liberty Swap logo" loading="lazy"></span> Liberty Swap ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://houdiniswap.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://houdiniswap.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🎩'" alt="Houdini Swap logo" loading="lazy"></span> Houdini Swap ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🔄</span> Dexs <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Dexs links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.pulsex.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0x95b303987a60c71504d99aa1b13b4da07b0790ab.png" alt="PLSX logo" loading="lazy"></span> PulseX ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://beta.0xtide.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://beta.0xtide.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🌊'" alt="0xTide logo" loading="lazy"></span> 0xTide ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.9inch.io/swap?chain=pulse" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://app.9inch.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='📏'" alt="9inch logo" loading="lazy"></span> 9inch ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://dex.9mm.pro/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dex.9mm.pro/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🔫'" alt="9mm logo" loading="lazy"></span> 9mm ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://dex.dextop.pro/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dex.dextop.pro/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🏔️'" alt="DexTop logo" loading="lazy"></span> DexTop ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://phux.io/#/pulse/trade" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://phux.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='💧'" alt="PHUX logo" loading="lazy"></span> PHUX ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🌾</span> Farms <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Farms links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.9inch.io/farms?chain=pulsechain" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://app.9inch.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='📏'" alt="9inch Farms logo" loading="lazy"></span> 9inch Farms ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://www.daytona.finance/farms" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://www.daytona.finance/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🏎️'" alt="Daytona Finance logo" loading="lazy"></span> Daytona Finance ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://helgo.io/dapp" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://helgo.io/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🌿'" alt="Helgo logo" loading="lazy"></span> Helgo ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.hocuspocus.finance/farms" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://app.hocuspocus.finance/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🎩'" alt="Hocus Pocus logo" loading="lazy"></span> Hocus Pocus ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://pulselorian.com/yieldFarm" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://pulselorian.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🚀'" alt="Pulselorian logo" loading="lazy"></span> Pulselorian ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">💎</span> Hex <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Hex links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://hexgraphs.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://hexgraphs.com/favicon.ico" alt="HEX Graphs logo" loading="lazy"></span> HEX Graphs ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://hex.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39.png" onerror="this.src='https://hex.com/favicon.ico';this.onerror=null" alt="HEX.com logo" loading="lazy"></span> HEX.com ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">💳</span> Onramps <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Onramps links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://app.provex.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xf6f8db0aba00007681f8faf16a0fda1c9b030b11.png" alt="PRVX logo" loading="lazy"></span> ProveX ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://0xcoast.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://0xcoast.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='🌊'" alt="0xCoast logo" loading="lazy"></span> 0xCoast ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://changenow.app.link/referral?link_id=87fb8fbefc1ed4" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://changenow.io/favicon.ico" alt="ChangeNow logo" loading="lazy"></span> ChangeNow ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://tinyurl.com/plsfoliobuy" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon">💸</span> PLSFolio Buy ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">📈</span> Stats <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Stats links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://portfolio.tires" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://portfolio.tires/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='📊'" alt="portfolio.tires logo" loading="lazy"></span> portfolio.tires ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://www.pulsechainstats.com/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://www.pulsechainstats.com/favicon.ico" onerror="this.style.display='none';this.parentNode.textContent='📉'" alt="PulseChain Stats logo" loading="lazy"></span> PulseChain Stats ↗</a>
-              </div>
-            </div>
-            <div class="tab-dropdown-submenu">
-              <span class="tab-dropdown-item tab-dropdown-submenu-trigger" role="menuitem" tabindex="0">
-                <span class="tab-dropdown-icon">🪙</span> Wallets <span class="tab-submenu-caret">▶</span>
-              </span>
-              <div class="tab-dropdown-submenu-content" role="menu" aria-label="Wallets links">
-                <a class="tab-dropdown-item" role="menuitem" href="https://metamask.io/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://metamask.io/favicon.ico" onerror="this.src='https://metamask.io/images/metamask-fox.svg';this.onerror=null" alt="MetaMask logo" loading="lazy"></span> MetaMask ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://internetmoney.io/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://internetmoney.io/favicon.ico" alt="Internet Money Wallet logo" loading="lazy"></span> Internet Money Wallet ↗</a>
-                <a class="tab-dropdown-item" role="menuitem" href="https://rabby.io/" target="_blank" rel="noopener noreferrer"><span class="tab-dropdown-icon"><img src="https://cdn.jsdelivr.net/gh/RabbyHub/Rabby@main/src/ui/assets/images/logo-cache.png" onerror="this.src='https://rabby.io/assets/images/logo.png';this.onerror=null" alt="Rabby Wallet logo" loading="lazy"></span> Rabby Wallet ↗</a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-      <div class="header-right">
-        <!-- User Profile Button -->
-        <button class="user-profile-btn" id="user-profile-btn" title="User Profile" aria-label="Open user profile" aria-haspopup="dialog">
-          <svg class="user-profile-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
-            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-          </svg>
-        </button>
+<!-- ═══════════════════════════════════════════════════
+     TOP NAV BAR
+     ═══════════════════════════════════════════════════ -->
+<header class="topbar" role="banner">
 
-        <!-- Watchlist Star -->
-        <button class="watchlist-star-btn" id="watchlist-star-btn" title="Watchlist" aria-label="Open watchlist" aria-controls="tab-watchlist">
-          <span aria-hidden="true">⭐</span>
-        </button>
+  <a class="logo logo-link" href="#" aria-label="PulseCentral home">
+    <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="16" cy="16" r="16" fill="#7b2fff" opacity=".15"/>
+      <path d="M8 16 L13 9 L16 14 L19 11 L24 16 L19 23 L16 18 L13 21 Z" fill="#7b2fff" stroke="#7b2fff" stroke-width=".5" stroke-linejoin="round"/>
+    </svg>
+    <span class="pulse">Pulse</span><span class="central">Central</span>
+  </a>
 
-        <!-- Price Alerts Bell -->
-        <div class="price-alerts-wrap" id="price-alerts-wrap">
-          <button class="price-alerts-btn" id="price-alerts-btn" title="Price Alerts" aria-label="Price alerts" aria-haspopup="true" aria-expanded="false">
-            <span class="bell-icon" aria-hidden="true">🔔</span>
-            <span class="bell-badge hidden" id="bell-badge" aria-live="polite" aria-atomic="true"></span>
-          </button>
-          <div class="alerts-dropdown hidden" id="alerts-dropdown" role="menu" aria-label="Price alerts">
-            <div class="alerts-dropdown-header">
-              <span>🔔 Price Alerts</span>
-              <button class="alerts-clear-btn" id="alerts-clear-btn" title="Clear all alerts" aria-label="Clear all price alerts">✕ Clear</button>
-            </div>
-            <div class="alerts-list" id="alerts-list" role="list">
-              <div class="alerts-empty">No alerts yet. Tokens up +10% in 5 min will appear here.</div>
-            </div>
-          </div>
-        </div>
+  <nav class="tab-nav" role="tablist" aria-label="Main navigation">
+    <button class="tab-btn" data-tab="home"      role="tab" aria-selected="true"  aria-controls="tab-home">
+      <span aria-hidden="true">🏠</span><span class="tab-label">Home</span>
+    </button>
+    <button class="tab-btn" data-tab="markets"   role="tab" aria-selected="false" aria-controls="tab-markets">
+      <span aria-hidden="true">📊</span><span class="tab-label">Markets</span>
+    </button>
+    <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio">
+      <span aria-hidden="true">💼</span><span class="tab-label">Portfolio</span>
+    </button>
+    <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false" aria-controls="tab-watchlist">
+      <span aria-hidden="true">⭐</span><span class="tab-label">Watchlist</span>
+    </button>
+    <button class="tab-btn" data-tab="swap"      role="tab" aria-selected="false" aria-controls="tab-swap">
+      <span aria-hidden="true">🔄</span><span class="tab-label">Swap</span>
+    </button>
+    <button class="tab-btn" data-tab="trades"    role="tab" aria-selected="false" aria-controls="tab-trades">
+      <span aria-hidden="true">📒</span><span class="tab-label">Trades</span>
+    </button>
+    <button class="tab-btn" data-tab="ecosystem" role="tab" aria-selected="false" aria-controls="tab-ecosystem">
+      <span aria-hidden="true">🌐</span><span class="tab-label">Ecosystem</span>
+    </button>
+    <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
+      <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
+    </button>
+  </nav>
 
-        <div class="theme-picker" role="group" aria-label="Choose color theme">
-          <button class="theme-swatch" data-theme="pulsechain" title="PulseChain" aria-label="PulseChain theme">PulseChain</button>
-          <button class="theme-swatch" data-theme="hex"        title="HEX"        aria-label="HEX theme">Hex</button>
-          <button class="theme-swatch" data-theme="pulsex"     title="PulseX"     aria-label="PulseX theme">PulseX</button>
-          <button class="theme-swatch" data-theme="incentive"  title="Incentive"  aria-label="Incentive theme">Inc</button>
-        </div>
-      </div>
+  <div class="topbar-actions">
+    <!-- Theme swatches -->
+    <div class="theme-swatches" aria-label="Theme picker">
+      <button class="theme-swatch" data-theme="pulsechain" style="background:#7b2fff" title="PulseChain theme" aria-label="PulseChain theme"></button>
+      <button class="theme-swatch" data-theme="hex"        style="background:#e8002d" title="HEX theme"        aria-label="HEX theme"></button>
+      <button class="theme-swatch" data-theme="pulsex"     style="background:#ff6d00" title="PulseX theme"     aria-label="PulseX theme"></button>
+      <button class="theme-swatch" data-theme="inc"        style="background:#00e676" title="INC theme"        aria-label="INC theme"></button>
     </div>
-  </header>
 
-  <!-- ===== TRENDING TICKER BAR ===== -->
-  <div class="ticker-bar" id="ticker-bar" aria-label="Trending coins ticker" role="marquee">
-    <div class="ticker-label-wrap" id="ticker-label-wrap">
-      <button class="ticker-label" id="ticker-mode-btn" title="Click to switch between Trending and Watchlist">
-        <span id="ticker-mode-icon">🔥</span> <span id="ticker-mode-text">Trending</span>
-      </button>
-    </div>
-    <div class="ticker-track-wrap">
-      <div class="ticker-track" id="ticker-track">
-        <div class="ticker-loading" id="ticker-loading">Loading trending tokens…</div>
+    <!-- Price alert bell -->
+    <div class="bell-wrap" id="bell-wrap">
+      <button class="btn btn-ghost btn-icon" id="bell-btn" aria-label="Price alerts" aria-expanded="false">🔔</button>
+      <span class="bell-badge hidden" id="bell-badge" aria-live="polite"></span>
+      <div class="alerts-dropdown hidden" id="alerts-dropdown" role="region" aria-label="Price alerts">
+        <div class="alerts-header">
+          <span>🚀 Price Alerts</span>
+          <button class="btn btn-ghost btn-sm" id="alerts-clear-btn">Clear all</button>
+        </div>
+        <div id="alerts-list"></div>
       </div>
     </div>
   </div>
 
-  <!-- ===== MAIN CONTENT ===== -->
-  <main class="main-content">
+</header>
 
-    <!-- ── HOME TAB ── -->
-    <section id="tab-home" class="tab-panel active" role="tabpanel" aria-labelledby="btn-home">
+<!-- ═══════════════════════════════════════════════════
+     TICKER BAR
+     ═══════════════════════════════════════════════════ -->
+<div class="ticker-bar" aria-label="Live token prices ticker" role="marquee">
+  <div class="ticker-inner" id="ticker-track"></div>
+  <button class="ticker-mode-btn" id="ticker-mode-btn" aria-label="Switch ticker mode">
+    <span id="ticker-mode-icon" aria-hidden="true">🔥</span>
+    <span id="ticker-mode-text">Trending</span>
+  </button>
+</div>
 
-      <!-- Hero banner -->
-      <div class="home-hero">
-        <h1 class="home-hero-title">
-          <span class="logo-pulse">Pulse</span><span class="logo-central">Central</span>
-        </h1>
-        <p class="home-hero-subtitle">Live prices &amp; charts for PulseChain's core tokens</p>
+<!-- ═══════════════════════════════════════════════════
+     HOME TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-home" class="tab-panel active" role="tabpanel" aria-labelledby="tab-home-btn">
+  <div class="page">
+
+    <!-- Hero market stats bar -->
+    <div class="home-hero" id="home-hero">
+      <div class="hero-stat" id="hero-fear">
+        <div class="hero-stat-label">Fear &amp; Greed</div>
+        <div class="hero-stat-value" style="font-size:1rem">Loading…</div>
       </div>
-
-      <!-- Error -->
-      <div id="home-error" class="error-banner hidden" role="alert"></div>
-
-      <!-- Loading -->
-      <div id="home-loading" class="loading-wrap">
-        <div class="pulse-loader" aria-label="Loading market data"></div>
-        <p>Loading core coin prices…</p>
+      <div class="hero-stat" id="hero-btc-dom">
+        <div class="hero-stat-label">BTC Dominance</div>
+        <div class="hero-stat-value">—</div>
       </div>
-
-      <!-- Core coin cards grid -->
-      <div id="home-coins-grid" class="home-coins-grid hidden"></div>
-
-      <!-- Last updated + refresh -->
-      <div id="home-footer" class="home-footer hidden">
-        <span id="home-last-updated" class="home-last-updated"></span>
-        <button id="home-refresh-btn" class="btn btn-secondary btn-sm" aria-label="Refresh prices">↻ Refresh</button>
-        <span class="dex-attribution" style="margin:0">
-          Data: <a href="https://dexscreener.com" target="_blank" rel="noopener">DexScreener</a>
-        </span>
+      <div class="hero-stat" id="hero-total-mcap">
+        <div class="hero-stat-label">Total Market Cap</div>
+        <div class="hero-stat-value">—</div>
       </div>
+    </div>
 
-    </section>
+    <!-- Status bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+      <div style="font-size:.78rem;color:var(--text-2);" id="home-timestamp"></div>
+      <button class="btn btn-ghost btn-sm" id="home-refresh-btn">↻ Refresh</button>
+    </div>
 
-    <!-- ── SWAP TAB ── -->
-    <section id="tab-swap" class="tab-panel" role="tabpanel" aria-labelledby="btn-swap">
-      <div class="swap-tab-wrap">
-        <div class="swap-tab-header">
-          <h1 id="swap-dex-title">Swap</h1>
-          <p class="section-subtitle" id="swap-dex-subtitle">Trade tokens on PulseX — PulseChain's native DEX.</p>
-          <a class="swap-open-link" id="swap-open-link" href="https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/" target="_blank" rel="noopener noreferrer">Open in PulseX ↗</a>
-        </div>
-        <div class="swap-iframe-wrap">
-          <iframe
-            id="swap-iframe"
-            class="swap-iframe"
-            src=""
-            title="DEX Swap"
-            allow="clipboard-write"
-          ></iframe>
-        </div>
-      </div>
-    </section>
+    <!-- Loading / error states -->
+    <div class="page-loader" id="home-loading">
+      <div class="spinner"></div>
+      <div>Loading PulseChain data…</div>
+    </div>
+    <div class="error-banner hidden" id="home-error" role="alert"></div>
 
-    <!-- ── PORTFOLIO TAB ── -->
-    <section id="tab-portfolio" class="tab-panel" role="tabpanel" aria-labelledby="btn-portfolio">
-      <div class="section-header portfolio-section-header">
-        <div>
-          <h1>Portfolio Tracker</h1>
-          <p class="section-subtitle">Enter a PulseChain wallet address to view its holdings and estimated value.</p>
-        </div>
-        <div class="portfolio-header-actions">
-          <button id="add-wallet-toggle-btn" class="btn btn-primary" aria-expanded="false" aria-controls="wallet-add-collapse">
-            ➕ Add Wallet
-          </button>
-          <button id="create-group-btn" class="btn btn-primary" aria-label="Create a new portfolio group">
-            ＋ New Group
-          </button>
-          <button id="edit-saved-btn" class="btn btn-secondary" aria-label="Edit saved addresses and groups">
-            ✎ Edit
-          </button>
-        </div>
-      </div>
+    <!-- Core coin cards grid -->
+    <div class="coin-grid" id="coin-grid" role="list"></div>
 
-      <!-- Saved wallet/group selector -->
-      <div class="portfolio-selector-bar" id="portfolio-selector-bar">
-        <label class="portfolio-selector-label" for="portfolio-quick-select">Quick Select:</label>
-        <select id="portfolio-quick-select" class="portfolio-quick-select" aria-label="Select saved wallet or group">
-          <option value="">— Select saved wallet or group —</option>
-        </select>
-      </div>
+    <!-- Ecosystem quick-stats (populated by JS) -->
+    <div id="ecosystem-stats" class="hidden eco-section">
+      <div class="eco-title">Ecosystem</div>
+      <div class="eco-subtitle">PulseChain bridge &amp; network stats</div>
+      <div class="eco-grid">
 
-      <!-- Collapsible wallet address entry -->
-      <div id="wallet-add-collapse" class="wallet-add-collapse hidden">
-        <div class="wallet-search-bar">
-          <input
-            id="wallet-input"
-            type="text"
-            class="wallet-input"
-            placeholder="0x… PulseChain wallet address"
-            autocomplete="off"
-            spellcheck="false"
-            maxlength="42"
-            aria-label="Wallet address"
-          />
-          <input
-            id="wallet-name-input"
-            type="text"
-            class="wallet-input wallet-name-input"
-            placeholder="Wallet name (optional)"
-            autocomplete="off"
-            maxlength="60"
-            aria-label="Wallet name"
-          />
-          <button id="load-portfolio-btn" class="btn btn-primary">
-            <span id="load-portfolio-btn-text">Load Portfolio</span>
-            <span id="load-portfolio-spinner" class="spinner hidden" aria-hidden="true"></span>
-          </button>
-          <button id="save-wallet-btn" class="btn btn-save-wallet" title="Save wallet to Watchlist" aria-label="Save wallet to Watchlist">
-            ☆ Save
-          </button>
-        </div>
-      </div>
-
-      <div id="portfolio-error" class="error-banner hidden" role="alert"></div>
-
-      <!-- Active group label (shown when a group is loaded) -->
-      <div id="group-context-banner" class="group-context-banner hidden">
-        <span id="group-context-name"></span>
-        <span class="group-context-addresses" id="group-context-addresses"></span>
-      </div>
-
-      <!-- Summary cards -->
-      <div id="portfolio-summary" class="summary-cards hidden">
-        <div class="summary-card">
-          <span class="summary-label" id="summary-total-label">Total Value (USD)</span>
-          <span class="summary-value" id="summary-total-usd">—</span>
-
-        </div>
-        <div class="summary-card">
-          <span class="summary-label">Total Value (PLS)</span>
-          <span class="summary-value" id="summary-total-pls">—</span>
-        </div>
-        <div class="summary-card">
-          <span class="summary-label">Tokens Held</span>
-          <span class="summary-value" id="summary-token-count">—</span>
-        </div>
-        <div class="summary-card">
-          <span class="summary-label">PLS Balance</span>
-          <span class="summary-value" id="summary-pls-balance">—</span>
-        </div>
-      </div>
-
-      <!-- Portfolio Composition Pie Chart -->
-      <div id="portfolio-pie-section" class="portfolio-pie-section hidden">
-        <div class="portfolio-chart-header">
-          <h3 class="portfolio-chart-title">🥧 Portfolio Composition</h3>
-        </div>
-        <div class="portfolio-pie-body">
-          <div class="portfolio-pie-chart-wrap">
-            <svg id="portfolio-pie-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-label="Portfolio composition pie chart" role="img"></svg>
-          </div>
-          <ul class="portfolio-pie-legend" id="portfolio-pie-legend" aria-label="Token allocation legend"></ul>
-        </div>
-      </div>
-
-      <!-- Portfolio History Chart -->
-      <div id="portfolio-chart-section" class="portfolio-chart-section hidden">
-        <div class="portfolio-chart-header">
-          <h3 class="portfolio-chart-title">📈 Portfolio History</h3>
-          <div class="portfolio-chart-controls">
-            <div class="chart-toggle-group" role="group" aria-label="Currency">
-              <button class="chart-toggle-btn active" data-chart-currency="usd" aria-pressed="true">USD</button>
-              <button class="chart-toggle-btn" data-chart-currency="pls" aria-pressed="false">PLS</button>
-            </div>
-            <div class="chart-toggle-group" role="group" aria-label="Time frame">
-              <button class="chart-toggle-btn active" data-chart-timeframe="daily" aria-pressed="true">Daily</button>
-              <button class="chart-toggle-btn" data-chart-timeframe="weekly" aria-pressed="false">Weekly</button>
-              <button class="chart-toggle-btn" data-chart-timeframe="monthly" aria-pressed="false">Monthly</button>
+        <!-- Bridge TVL card -->
+        <div class="eco-card" id="eco-bridge">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">🌉</span>
+            <div>
+              <div class="eco-card-title">Bridge TVL</div>
+              <div class="eco-card-desc">PulseChain ↔ Ethereum</div>
             </div>
           </div>
-        </div>
-        <div class="portfolio-chart-body">
-          <div id="portfolio-chart-notice" class="portfolio-chart-notice hidden"></div>
-          <div id="portfolio-chart-outer" class="portfolio-chart-outer hidden">
-            <svg id="portfolio-history-svg" viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Portfolio value history chart" role="img"></svg>
-            <div id="chart-tooltip" class="chart-tooltip hidden" role="tooltip" aria-hidden="true"></div>
-            <div id="chart-hover-overlay" class="chart-hover-overlay" aria-hidden="true"></div>
+          <div class="eco-metrics">
+            <div class="eco-metric">
+              <div class="eco-metric-label">Current</div>
+              <div class="eco-metric-value" data-eco="bridge-now">—</div>
+            </div>
+            <div class="eco-metric">
+              <div class="eco-metric-label">7d</div>
+              <div class="eco-metric-value" data-eco="bridge-7d">—</div>
+            </div>
+            <div class="eco-metric">
+              <div class="eco-metric-label">30d</div>
+              <div class="eco-metric-value" data-eco="bridge-30d">—</div>
+            </div>
           </div>
+          <div class="eco-chart" data-eco="bridge-chart"></div>
+          <div class="eco-source">Source: <a href="https://defillama.com/protocol/pulsechain-bridge" target="_blank" rel="noopener">DefiLlama</a></div>
         </div>
+
+      </div>
+    </div>
+
+  </div><!-- /page -->
+</div><!-- /tab-home -->
+
+<!-- ═══════════════════════════════════════════════════
+     MARKETS TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-markets" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div class="page-title">Markets</div>
+    <div class="page-subtitle">Top PulseChain tokens by volume</div>
+
+    <!-- Toolbar -->
+    <div class="market-toolbar">
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input type="search" class="input search-input" id="market-search" placeholder="Search token name or address…" autocomplete="off" spellcheck="false" aria-label="Search tokens">
+        <div class="search-dropdown hidden" id="search-dropdown" role="listbox" aria-label="Search results"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="markets-refresh-btn">↻ Refresh</button>
+    </div>
+
+    <!-- Loading / error -->
+    <div class="page-loader" id="markets-loading"><div class="spinner"></div><div>Fetching market data…</div></div>
+    <div class="error-banner hidden" id="markets-error" role="alert"></div>
+
+    <!-- Market list -->
+    <div id="market-list" class="hidden">
+      <!-- Top pagination -->
+      <div class="market-pagination">
+        <button class="btn btn-ghost btn-sm" id="prev-btn" disabled aria-label="Previous page">← Prev</button>
+        <span id="page-info" aria-live="polite"></span>
+        <button class="btn btn-ghost btn-sm" id="next-btn" aria-label="Next page">Next →</button>
       </div>
 
-      <!-- Portfolio toolbar -->
-      <div id="portfolio-toolbar" class="portfolio-toolbar hidden">
-        <label class="toggle-label" for="hide-small-balances">
-          <input type="checkbox" id="hide-small-balances" checked />
-          Hide coins &lt; $0.05
+      <!-- Column headers -->
+      <div class="market-header" role="row">
+        <span>#</span>
+        <span>Token</span>
+        <button class="sort-btn" data-col="price" role="columnheader">Price</button>
+        <button class="sort-btn" data-col="change" role="columnheader">24h</button>
+        <button class="sort-btn hide-mobile" data-col="mcap" role="columnheader">Mkt Cap</button>
+        <button class="sort-btn hide-mobile" data-col="vol" role="columnheader">Volume</button>
+        <button class="sort-btn hide-mobile" data-col="liq" role="columnheader">Liquidity</button>
+      </div>
+
+      <!-- Rows injected by JS -->
+      <div id="market-rows" role="rowgroup"></div>
+
+      <!-- Bottom pagination -->
+      <div class="market-pagination">
+        <button class="btn btn-ghost btn-sm" id="prev-btn-bot" disabled aria-label="Previous page">← Prev</button>
+        <span id="page-info-bot" aria-live="polite"></span>
+        <button class="btn btn-ghost btn-sm" id="next-btn-bot" aria-label="Next page">Next →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PORTFOLIO TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-portfolio" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div class="page-title">Portfolio</div>
+
+    <!-- Error banner -->
+    <div class="error-banner hidden" id="portfolio-error" role="alert"></div>
+
+    <!-- Saved wallets bar -->
+    <div class="saved-wallets-bar hidden" id="saved-wallets-bar" aria-label="Saved wallets"></div>
+
+    <!-- Group quick-select -->
+    <div class="hidden" id="group-select-row" style="display:flex;align-items:center;gap:.625rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <label for="group-select" style="font-size:.82rem;color:var(--text-2);">Group:</label>
+      <select class="input select" id="group-select" style="max-width:260px;" aria-label="Select wallet group"></select>
+      <button class="btn btn-ghost btn-sm" id="create-group-btn">+ New Group</button>
+    </div>
+
+    <!-- Group banner (shown when a group is active) -->
+    <div class="hidden" id="group-banner" style="background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--radius-sm);padding:.6rem 1rem;margin-bottom:1rem;font-size:.85rem;display:flex;align-items:center;gap:.5rem;">
+      <span>👥</span>
+      <span>Viewing group <strong data-group-name></strong> — <span data-group-count></span></span>
+      <button onclick="document.getElementById('group-banner').classList.add('hidden')" style="margin-left:auto;color:var(--text-3);">✕</button>
+    </div>
+
+    <!-- Add wallet form / toggle -->
+    <div style="margin-bottom:1.25rem;">
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.625rem;">
+        <input type="text" class="input" id="wallet-input"
+               placeholder="0x… wallet address"
+               style="max-width:360px;"
+               autocomplete="off" spellcheck="false"
+               aria-label="Wallet address">
+        <input type="text" class="input" id="wallet-name-input"
+               placeholder="Label (optional)"
+               style="max-width:160px;"
+               aria-label="Wallet label">
+        <button class="btn btn-primary" id="load-btn" aria-label="Load portfolio">
+          <span id="load-btn-text">Load</span>
+          <span class="spinner hidden" id="load-spinner" style="width:14px;height:14px;border-width:2px;" aria-hidden="true"></span>
+        </button>
+        <button class="btn btn-ghost" id="save-wallet-btn" aria-label="Save wallet">☆ Save</button>
+        <button class="btn btn-ghost btn-sm" id="add-wallet-toggle" aria-expanded="false">+ Add Wallet</button>
+      </div>
+
+      <!-- Collapsed extra wallet input (for adding to groups etc.) -->
+      <div class="hidden" id="add-wallet-panel"
+           style="background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-top:.5rem;font-size:.85rem;color:var(--text-2);">
+        Use the input above to load any wallet address. Save it with the ☆ button to keep it in your saved wallets bar.
+        Use <strong>Groups</strong> to track multiple wallets combined.
+      </div>
+    </div>
+
+    <!-- Portfolio empty state -->
+    <div class="portfolio-empty" id="portfolio-empty">
+      <div class="portfolio-empty-icon">💼</div>
+      <h3>Enter a wallet address to get started</h3>
+      <p>Load any PulseChain wallet to see your token balances, USD values, and portfolio history.</p>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="portfolio-summary hidden" id="portfolio-summary">
+      <div class="summary-card">
+        <div class="summary-label" id="summary-total-label">Total (USD)</div>
+        <div class="summary-value" id="summary-total">—</div>
+        <button class="btn btn-ghost btn-sm" id="summary-currency-btn" style="margin-top:.4rem;" aria-label="Toggle currency">Toggle PLS/USD</button>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">PLS Balance</div>
+        <div class="summary-value" id="summary-pls-bal">—</div>
+        <div class="summary-sub" id="summary-pls-val"></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Tokens Held</div>
+        <div class="summary-value" id="summary-token-count">—</div>
+      </div>
+    </div>
+
+    <!-- Pie chart + legend -->
+    <div class="hidden" id="portfolio-pie">
+      <div class="pie-section">
+        <div class="pie-wrap">
+          <svg id="pie-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg"
+               style="width:220px;height:220px;" aria-label="Portfolio allocation pie chart" role="img"></svg>
+        </div>
+        <div class="pie-legend" id="pie-legend"></div>
+      </div>
+    </div>
+
+    <!-- Portfolio history chart -->
+    <div class="history-section hidden" id="portfolio-history">
+      <div class="history-toolbar">
+        <span style="font-size:.82rem;font-weight:600;">Value History</span>
+        <div style="display:flex;gap:.25rem;" role="group" aria-label="Currency">
+          <button class="tf-btn active" data-hist-currency="usd">USD</button>
+          <button class="tf-btn" data-hist-currency="pls">PLS</button>
+        </div>
+        <div style="display:flex;gap:.25rem;" role="group" aria-label="Time frame">
+          <button class="tf-btn active" data-hist-tf="daily">Daily</button>
+          <button class="tf-btn" data-hist-tf="weekly">Weekly</button>
+          <button class="tf-btn" data-hist-tf="monthly">Monthly</button>
+        </div>
+      </div>
+      <div class="history-chart-wrap" style="position:relative;">
+        <svg id="history-svg" viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg"
+             style="width:100%;height:200px;" aria-label="Portfolio value history chart" role="img"
+             preserveAspectRatio="none"></svg>
+        <div class="history-chart-overlay" id="history-overlay" role="presentation"></div>
+        <div class="chart-tooltip hidden" id="history-tooltip">
+          <div class="chart-tooltip-date"></div>
+          <div class="chart-tooltip-val"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hide small positions toggle -->
+    <div class="hidden" id="portfolio-table-wrap">
+      <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:.5rem;flex-wrap:wrap;">
+        <span style="font-size:.875rem;font-weight:600;">Holdings</span>
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-2);cursor:pointer;margin-left:auto;">
+          <input type="checkbox" id="hide-small-toggle" checked style="accent-color:var(--primary);">
+          Hide &lt;$0.05 <span id="dust-count" style="color:var(--text-3);"></span>
         </label>
-        <span id="hidden-coins-count" class="hidden-coins-count"></span>
       </div>
-
-      <!-- Token holdings table -->
-      <div id="portfolio-table-wrap" class="table-wrap hidden">
-        <table class="data-table" id="portfolio-table">
+      <div class="portfolio-table-wrap">
+        <table class="portfolio-table" aria-label="Portfolio holdings">
           <thead>
             <tr>
               <th>#</th>
               <th>Token</th>
-              <th>Symbol</th>
-              <th class="align-right">Balance</th>
-              <th class="align-right">Price (USD)</th>
-              <th class="align-right">Value (USD)</th>
-              <th class="align-right">24 h %</th>
+              <th class="r">Balance</th>
+              <th class="r">Price</th>
+              <th class="r">Value</th>
+              <th class="r">24h</th>
             </tr>
           </thead>
-          <tbody id="portfolio-tbody">
-          </tbody>
+          <tbody id="portfolio-tbody"></tbody>
         </table>
       </div>
+    </div>
 
-      <!-- Empty state -->
-      <div class="empty-state" id="portfolio-empty">
-        <div class="empty-icon">💼</div>
-        <h2>No portfolio loaded</h2>
-        <p>Enter a PulseChain wallet address above to get started.</p>
+  </div><!-- /page -->
+</div><!-- /tab-portfolio -->
+
+<!-- ═══════════════════════════════════════════════════
+     WATCHLIST TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-watchlist" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.25rem;flex-wrap:wrap;">
+      <div class="page-title" style="margin-bottom:0;">Watchlist</div>
+      <span class="badge badge-neu" id="wl-count" style="font-size:.78rem;">0</span>
+    </div>
+    <div class="page-subtitle">Track tokens. Star any token on Home or Markets to add it here.</div>
+
+    <!-- Add by address -->
+    <div class="wl-add-bar">
+      <input type="text" class="input" id="wl-add-input"
+             placeholder="Add token by contract address…"
+             autocomplete="off" spellcheck="false"
+             aria-label="Token contract address">
+      <button class="btn btn-primary" id="wl-add-btn">+ Add</button>
+      <span class="error-banner hidden" id="wl-add-error" style="padding:.3rem .6rem;font-size:.75rem;" role="alert"></span>
+    </div>
+
+    <!-- States -->
+    <div class="page-loader hidden" id="wl-loading"><div class="spinner"></div><div>Loading prices…</div></div>
+    <div class="wl-empty hidden" id="wl-empty">
+      ⭐ Your watchlist is empty.<br>Star tokens on the Home or Markets tabs, or paste a contract address above.
+    </div>
+
+    <!-- Table -->
+    <div class="wl-table-wrap hidden" id="wl-table-wrap">
+      <table class="wl-table" aria-label="Watchlist tokens">
+        <thead>
+          <tr>
+            <th style="width:56px;"></th>
+            <th>Token</th>
+            <th class="r">Price</th>
+            <th class="r">24h</th>
+            <th class="r hide-mobile">Volume</th>
+            <th class="r hide-mobile">Mkt Cap</th>
+            <th class="r hide-mobile">Liquidity</th>
+            <th class="r"></th>
+          </tr>
+        </thead>
+        <tbody id="wl-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SWAP TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-swap" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div class="page-title">Swap</div>
+    <div class="page-subtitle">Swap tokens on PulseChain directly below.</div>
+
+    <div class="swap-wrap">
+      <iframe class="swap-iframe" id="swap-iframe"
+              title="PulseX DEX"
+              allow="clipboard-write"
+              loading="lazy"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
+      </iframe>
+
+      <div class="swap-links">
+        <a class="swap-link-chip" href="https://app.piteas.io/#/swap?inputCurrency=PLS" target="_blank" rel="noopener">
+          <img src="https://app.piteas.io/favicon.ico" alt="" onerror="this.style.display='none'">
+          Piteas
+        </a>
+        <a class="swap-link-chip" href="https://9mm.pro/swap" target="_blank" rel="noopener">
+          9mm DEX
+        </a>
+        <a class="swap-link-chip" href="https://libertyswap.finance/swap" target="_blank" rel="noopener">
+          LibertySwap
+        </a>
+        <a class="swap-link-chip" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener">
+          📈 DexScreener
+        </a>
       </div>
-    </section>
+    </div>
 
-    <!-- ── MARKETS TAB ── -->
-    <section id="tab-markets" class="tab-panel" role="tabpanel" aria-labelledby="btn-markets">
+  </div>
+</div>
 
-      <!-- ── Markets: PLS Top 50 sub-page ── -->
-      <div id="markets-page-top50">
-        <div class="section-header">
-          <h1>PulseChain Markets</h1>
-          <p class="section-subtitle">PulseChain tokens ranked by market capitalization</p>
+<!-- ═══════════════════════════════════════════════════
+     TRADE LOG TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-trades" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.25rem;flex-wrap:wrap;">
+      <div class="page-title" style="margin-bottom:0;">Trade Log</div>
+      <span class="badge badge-neu" id="trade-count">0</span>
+    </div>
+    <div class="page-subtitle">Track buys &amp; sells, import from your wallet, calculate P&amp;L.</div>
+
+    <!-- P&L summary -->
+    <div class="trades-summary">
+      <div class="summary-card">
+        <div class="summary-label">Realised P&amp;L</div>
+        <div class="summary-value" id="summary-realized">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Unrealised P&amp;L</div>
+        <div class="summary-value" id="summary-unrealized">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Tokens Traded</div>
+        <div class="summary-value" id="summary-tokens-traded">0</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="trades-toolbar">
+      <button class="btn btn-primary btn-sm" id="add-trade-btn">+ Add Trade</button>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto;flex-wrap:wrap;">
+        <input type="text" class="input" id="import-addr-input"
+               placeholder="Wallet address to import…"
+               style="max-width:280px;"
+               autocomplete="off" spellcheck="false"
+               aria-label="Wallet address for trade import">
+        <button class="btn btn-ghost btn-sm" id="import-trades-btn">📥 Import from Wallet</button>
+      </div>
+    </div>
+
+    <!-- Add trade form -->
+    <div class="add-trade-card hidden" id="add-trade-panel">
+      <div style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Add Trade</div>
+      <div class="add-trade-grid">
+        <div>
+          <label class="form-label" for="trade-type-select">Type</label>
+          <select class="input select" id="trade-type-select">
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
         </div>
+        <div>
+          <label class="form-label" for="trade-addr-input">Token Address</label>
+          <input type="text" class="input" id="trade-addr-input" placeholder="0x…" autocomplete="off">
+        </div>
+        <div>
+          <label class="form-label" for="trade-sym-input">Symbol</label>
+          <input type="text" class="input" id="trade-sym-input" placeholder="e.g. HEX" autocomplete="off">
+        </div>
+        <div>
+          <label class="form-label" for="trade-amt-input">Token Amount</label>
+          <input type="number" class="input" id="trade-amt-input" placeholder="0" min="0" step="any">
+        </div>
+        <div>
+          <label class="form-label" for="trade-pls-input">PLS Amount</label>
+          <input type="number" class="input" id="trade-pls-input" placeholder="0" min="0" step="any">
+        </div>
+        <div>
+          <label class="form-label" for="trade-date-input">Date &amp; Time</label>
+          <input type="datetime-local" class="input" id="trade-date-input">
+        </div>
+      </div>
+      <div style="margin-top:.75rem;display:flex;gap:.5rem;">
+        <button class="btn btn-primary" id="trade-form-submit">Save Trade</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('add-trade-panel').classList.add('hidden')">Cancel</button>
+      </div>
+    </div>
 
-        <div class="markets-toolbar top50-toolbar">
-          <div class="top50-pagination" id="top50-pagination-top">
-            <button id="top50-prev-btn" class="btn btn-secondary btn-sm" disabled aria-label="Previous page">← Prev</button>
-            <span id="top50-page-info" class="top50-page-info">Page 1</span>
-            <button id="top50-next-btn" class="btn btn-secondary btn-sm" aria-label="Next page">Next →</button>
+    <!-- Trade table -->
+    <div class="trade-empty hidden" id="trades-empty">
+      📒 No trades yet. Add a trade manually or import from a wallet address.
+    </div>
+
+    <div class="trade-table-wrap hidden" id="trades-table-wrap">
+      <table class="trade-table" aria-label="Trade log">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Token</th>
+            <th class="r">Amount</th>
+            <th class="r">PLS Spent</th>
+            <th class="r">Price/Token</th>
+            <th class="r"></th>
+          </tr>
+        </thead>
+        <tbody id="trades-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     ECOSYSTEM TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-ecosystem" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div class="page-title">Ecosystem</div>
+    <div class="page-subtitle">PulseChain network &amp; protocol stats</div>
+
+    <div class="eco-grid">
+
+      <!-- Bridge TVL -->
+      <div class="eco-card" id="eco-bridge-full">
+        <div class="eco-card-head">
+          <span class="eco-card-icon">🌉</span>
+          <div>
+            <div class="eco-card-title">PulseChain Bridge TVL</div>
+            <div class="eco-card-desc">Locked assets Ethereum ↔ PulseChain</div>
           </div>
-          <div class="top50-toolbar-right">
-            <div class="search-wrap" id="search-wrap">
-              <input id="top50-search-input" type="search" class="search-input" placeholder="Search all chains…" aria-label="Search all chains" autocomplete="off">
-              <div class="search-dropdown hidden" id="search-dropdown" role="listbox" aria-label="Search results"></div>
-            </div>
-            <button id="top50-refresh-btn" class="btn btn-secondary" aria-label="Refresh PulseChain market data">
-              ↻ Refresh
-            </button>
+        </div>
+        <div class="eco-metrics">
+          <div class="eco-metric">
+            <div class="eco-metric-label">Current TVL</div>
+            <div class="eco-metric-value" id="eco-bridge-tvl-now">—</div>
+          </div>
+          <div class="eco-metric">
+            <div class="eco-metric-label">7d Change</div>
+            <div class="eco-metric-value" id="eco-bridge-tvl-7d">—</div>
+          </div>
+          <div class="eco-metric">
+            <div class="eco-metric-label">30d Change</div>
+            <div class="eco-metric-value" id="eco-bridge-tvl-30d">—</div>
           </div>
         </div>
+        <div class="eco-chart" id="eco-bridge-chart-full"></div>
+        <div class="eco-source">Source: <a href="https://defillama.com/protocol/pulsechain-bridge" target="_blank" rel="noopener">DefiLlama</a></div>
+      </div>
 
-        <div id="top50-error" class="error-banner hidden" role="alert"></div>
-
-        <div id="top50-loading" class="loading-wrap">
-          <div class="pulse-loader" aria-label="Loading PulseChain market data"></div>
-          <p>Loading PulseChain market data…</p>
-        </div>
-
-        <div id="top50-list" class="hidden">
-          <!-- header row -->
-          <div class="top50-header top50-row">
-            <span class="top50-col top50-rank">#</span>
-            <span class="top50-col top50-name">Name</span>
-            <button class="top50-col top50-price top50-sort-btn" data-sort-col="price" aria-label="Sort by Price">Price</button>
-            <button class="top50-col top50-change top50-sort-btn" data-sort-col="change" aria-label="Sort by 24h %">24h %</button>
-            <button class="top50-col top50-mcap top50-sort-btn sort-active sort-desc" data-sort-col="mcap" aria-label="Sort by Market Cap">Market Cap</button>
-            <button class="top50-col top50-vol top50-sort-btn" data-sort-col="vol" aria-label="Sort by Volume">Volume (24h)</button>
-            <button class="top50-col top50-liq top50-sort-btn" data-sort-col="liq" aria-label="Sort by Liquidity">Liquidity</button>
-          </div>
-          <div id="top50-rows"></div>
-          <!-- bottom pagination -->
-          <div class="top50-pagination top50-pagination-bottom" id="top50-pagination-bottom">
-            <button id="top50-prev-btn-bottom" class="btn btn-secondary btn-sm" disabled aria-label="Previous page">← Prev</button>
-            <span id="top50-page-info-bottom" class="top50-page-info">Page 1</span>
-            <button id="top50-next-btn-bottom" class="btn btn-secondary btn-sm" aria-label="Next page">Next →</button>
+      <!-- Fear & Greed -->
+      <div class="eco-card">
+        <div class="eco-card-head">
+          <span class="eco-card-icon">😱</span>
+          <div>
+            <div class="eco-card-title">Crypto Fear &amp; Greed</div>
+            <div class="eco-card-desc">Overall market sentiment</div>
           </div>
         </div>
-      </div>
-
-      <!-- ── Markets: Memes sub-page ── -->
-      <div id="markets-page-memes" class="hidden">
-        <div class="section-header">
-          <h1>RH Memes</h1>
-          <p class="section-subtitle">PulseChain meme tokens market data</p>
-        </div>
-
-        <div class="markets-toolbar top50-toolbar">
-          <div class="top50-toolbar-right">
-            <div class="search-wrap" id="memes-search-wrap">
-              <input id="memes-search-input" type="search" class="search-input" placeholder="Search all chains…" aria-label="Search all chains" autocomplete="off">
-              <div class="search-dropdown hidden" id="memes-search-dropdown" role="listbox" aria-label="Search results"></div>
-            </div>
-            <button id="memes-refresh-btn" class="btn btn-secondary" aria-label="Refresh Memes data">
-              ↻ Refresh
-            </button>
+        <div class="eco-metrics">
+          <div class="eco-metric" style="grid-column:1/-1;">
+            <div class="eco-metric-label">Index</div>
+            <div class="eco-metric-value" id="eco-fear-value" style="font-size:1rem;">—</div>
           </div>
         </div>
+        <div class="eco-source">Source: <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">Alternative.me</a></div>
+      </div>
 
-        <div id="memes-error" class="error-banner hidden" role="alert"></div>
-
-        <div id="memes-loading" class="loading-wrap">
-          <div class="pulse-loader" aria-label="Loading meme token data"></div>
-          <p>Loading meme token data…</p>
-        </div>
-
-        <div id="memes-list" class="hidden">
-          <!-- header row -->
-          <div class="top50-header top50-row">
-            <span class="top50-col top50-rank">#</span>
-            <span class="top50-col top50-name">Name</span>
-            <span class="top50-col top50-price">Price</span>
-            <span class="top50-col top50-change">24h %</span>
-            <span class="top50-col top50-mcap">Market Cap</span>
-            <span class="top50-col top50-vol">Volume (24h)</span>
-            <span class="top50-col top50-liq">Liquidity</span>
+      <!-- Global market -->
+      <div class="eco-card">
+        <div class="eco-card-head">
+          <span class="eco-card-icon">🌎</span>
+          <div>
+            <div class="eco-card-title">Global Crypto Market</div>
+            <div class="eco-card-desc">BTC dominance &amp; total market cap</div>
           </div>
-          <div id="memes-rows"></div>
+        </div>
+        <div class="eco-metrics">
+          <div class="eco-metric">
+            <div class="eco-metric-label">BTC Dom</div>
+            <div class="eco-metric-value" id="eco-btc-dom">—</div>
+          </div>
+          <div class="eco-metric">
+            <div class="eco-metric-label">Total MCap</div>
+            <div class="eco-metric-value" id="eco-total-mcap">—</div>
+          </div>
+          <div class="eco-metric">
+            <div class="eco-metric-label">24h Volume</div>
+            <div class="eco-metric-value" id="eco-total-vol">—</div>
+          </div>
+        </div>
+        <div class="eco-source">Source: <a href="https://www.coingecko.com/en/global-charts" target="_blank" rel="noopener">CoinGecko</a></div>
+      </div>
+
+    </div>
+
+    <div id="eco-loading" class="page-loader" style="margin-top:2rem;"><div class="spinner"></div><div>Loading ecosystem data…</div></div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     LINKS TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-links" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div class="page-title">Links</div>
+    <div class="page-subtitle">Essential PulseChain resources</div>
+
+    <div class="links-section">
+      <div class="links-section-title">Official</div>
+      <div class="links-grid">
+        <a class="link-card" href="https://pulsechain.com" target="_blank" rel="noopener">
+          <div class="link-ph-icon">⚡</div>
+          <div><div class="link-body-name">PulseChain</div><div class="link-body-desc">Official PulseChain website</div></div>
+        </a>
+        <a class="link-card" href="https://bridge.pulsechain.com" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🌉</div>
+          <div><div class="link-body-name">PulseChain Bridge</div><div class="link-body-desc">Bridge tokens from Ethereum</div></div>
+        </a>
+        <a class="link-card" href="https://scan.pulsechain.com" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🔍</div>
+          <div><div class="link-body-name">PulseScan</div><div class="link-body-desc">Block explorer &amp; wallet lookup</div></div>
+        </a>
+        <a class="link-card" href="https://hex.com" target="_blank" rel="noopener">
+          <div class="link-ph-icon" style="background:rgba(232,0,45,.12);border-color:#e8002d;">❤️</div>
+          <div><div class="link-body-name">HEX</div><div class="link-body-desc">HEX.com — stake &amp; earn</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="links-section">
+      <div class="links-section-title">DEX &amp; Trading</div>
+      <div class="links-grid">
+        <a class="link-card" href="https://pulsex.com" target="_blank" rel="noopener">
+          <div class="link-ph-icon" style="background:rgba(255,109,0,.12);border-color:#ff6d00;">🔄</div>
+          <div><div class="link-body-name">PulseX</div><div class="link-body-desc">Native PulseChain DEX</div></div>
+        </a>
+        <a class="link-card" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener">
+          <div class="link-ph-icon">📈</div>
+          <div><div class="link-body-name">DexScreener</div><div class="link-body-desc">Charts, pairs &amp; market data</div></div>
+        </a>
+        <a class="link-card" href="https://app.piteas.io" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🎯</div>
+          <div><div class="link-body-name">Piteas</div><div class="link-body-desc">DEX aggregator for best prices</div></div>
+        </a>
+        <a class="link-card" href="https://9mm.pro" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🎱</div>
+          <div><div class="link-body-name">9mm DEX</div><div class="link-body-desc">Concentrated liquidity DEX</div></div>
+        </a>
+        <a class="link-card" href="https://libertyswap.finance" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🗽</div>
+          <div><div class="link-body-name">LibertySwap</div><div class="link-body-desc">PulseChain swap &amp; yield</div></div>
+        </a>
+        <a class="link-card" href="https://www.dextools.io/app/en/pulse" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🔧</div>
+          <div><div class="link-body-name">DexTools</div><div class="link-body-desc">Advanced PulseChain charts</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="links-section">
+      <div class="links-section-title">Analytics &amp; Data</div>
+      <div class="links-grid">
+        <a class="link-card" href="https://defillama.com/chain/PulseChain" target="_blank" rel="noopener">
+          <div class="link-ph-icon">📊</div>
+          <div><div class="link-body-name">DefiLlama</div><div class="link-body-desc">TVL, protocols &amp; yield data</div></div>
+        </a>
+        <a class="link-card" href="https://gopluslabs.io" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🛡️</div>
+          <div><div class="link-body-name">GoPlus Security</div><div class="link-body-desc">Token security scanner</div></div>
+        </a>
+        <a class="link-card" href="https://www.geckoterminal.com/pulsechain/pools" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🦎</div>
+          <div><div class="link-body-name">GeckoTerminal</div><div class="link-body-desc">Pool explorer &amp; OHLCV data</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="links-section">
+      <div class="links-section-title">Community</div>
+      <div class="links-grid">
+        <a class="link-card" href="https://twitter.com/pulsechaincom" target="_blank" rel="noopener">
+          <div class="link-ph-icon">𝕏</div>
+          <div><div class="link-body-name">PulseChain X</div><div class="link-body-desc">Official Twitter/X account</div></div>
+        </a>
+        <a class="link-card" href="https://t.me/PulseChainCom" target="_blank" rel="noopener">
+          <div class="link-ph-icon">✈️</div>
+          <div><div class="link-body-name">PulseChain Telegram</div><div class="link-body-desc">Official Telegram community</div></div>
+        </a>
+        <a class="link-card" href="https://www.reddit.com/r/PulseChain/" target="_blank" rel="noopener">
+          <div class="link-ph-icon">🟠</div>
+          <div><div class="link-body-name">r/PulseChain</div><div class="link-body-desc">Reddit community</div></div>
+        </a>
+        <a class="link-card" href="https://github.com/Creatition/PulseCentral" target="_blank" rel="noopener">
+          <div class="link-ph-icon">&lt;/&gt;</div>
+          <div><div class="link-body-name">PulseCentral GitHub</div><div class="link-body-desc">Source code for this app</div></div>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TOKEN DETAILS MODAL
+     ═══════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="token-modal" role="dialog" aria-modal="true" aria-labelledby="modal-token-name">
+  <div class="modal">
+    <div class="modal-head">
+      <div style="display:flex;align-items:center;gap:.625rem;">
+        <div id="modal-logo-wrap"></div>
+        <div>
+          <div class="modal-title" id="modal-token-name"></div>
+          <div style="font-size:.75rem;color:var(--text-2);" id="modal-token-sym"></div>
         </div>
       </div>
+      <button class="modal-close" id="token-modal-close" aria-label="Close modal">✕</button>
+    </div>
 
-    </section>
+    <!-- Modal tabs -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 1.25rem;" role="tablist">
+      <button class="modal-tab-btn tab-btn active" data-modal-tab="overview"  role="tab" style="border-radius:0;padding:.625rem .875rem;">Overview</button>
+      <button class="modal-tab-btn tab-btn"         data-modal-tab="security" role="tab" style="border-radius:0;padding:.625rem .875rem;">Security 🛡️</button>
+      <button class="modal-tab-btn tab-btn"         data-modal-tab="whales"   role="tab" style="border-radius:0;padding:.625rem .875rem;">Whales 🐋</button>
+    </div>
 
-    <!-- ── LINKS TAB ── -->
-    <section id="tab-links" class="tab-panel" role="tabpanel" aria-labelledby="btn-links">
-      <div class="section-header">
-        <h1>Links</h1>
-        <p class="section-subtitle">Explore the PulseChain ecosystem — analytics, DEXs, bridges, and more.</p>
-      </div>
+    <!-- Tab panels -->
+    <div class="modal-body">
+      <div id="modal-overview" class="modal-tab-panel"></div>
+      <div id="modal-security" class="modal-tab-panel hidden"></div>
+      <div id="modal-whales"   class="modal-tab-panel hidden"></div>
+    </div>
+  </div>
+</div>
 
-      <!-- Analytics -->
-      <div class="tools-subsection-header links-first-section" id="links-analytics">
-        <h2>📊 Analytics</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://dexscreener.com/favicon.png" alt="DexScreener logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>DexScreener</h3><p>Real-time charts and trading pair data across PulseChain DEXs.</p></div>
-        </a>
-        <a class="tools-card" href="https://www.dextools.io/app/en/pulse/pairs" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">📊</span>
-          <div class="tools-card-body"><h3>DexTools</h3><p>Advanced trading tools, charts, and pair explorer for PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://www.geckoterminal.com/pulsechain/pools" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://www.geckoterminal.com/favicon.ico" alt="GeckoTerminal logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>GeckoTerminal</h3><p>On-chain trading data and pool analytics for PulseChain.</p></div>
-        </a>
-      </div>
+<!-- ═══════════════════════════════════════════════════
+     GROUPS MODAL
+     ═══════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="group-modal" role="dialog" aria-modal="true" aria-labelledby="group-modal-title">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="group-modal-title">New Group</span>
+      <button class="modal-close" id="group-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="group-id-input">
 
-      <!-- Aggregators -->
-      <div class="tools-subsection-header" id="links-aggregators">
-        <h2>🔀 Aggregators</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://x.libertyswap.finance/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🗽</span>
-          <div class="tools-card-body"><h3>Liberty Swap</h3><p>DEX aggregator — find the best swap rates across PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://9x.9mm.pro/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🔢</span>
-          <div class="tools-card-body"><h3>9x by 9mm</h3><p>Aggregator routing trades through PulseChain's top liquidity sources.</p></div>
-        </a>
-        <a class="tools-card" href="https://swap.internetmoney.io/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">💰</span>
-          <div class="tools-card-body"><h3>Internet Money Swap</h3><p>Swap aggregator powered by the Internet Money ecosystem.</p></div>
-        </a>
-        <a class="tools-card" href="https://app.piteas.io/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">⚡</span>
-          <div class="tools-card-body"><h3>Piteas</h3><p>Smart order routing for best-price swaps on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://swap.win/0x9b059cdacd851359cf0e41a366e68ea661146abc" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🏆</span>
-          <div class="tools-card-body"><h3>Swap.win</h3><p>Aggregated swap interface for PulseChain tokens.</p></div>
-        </a>
+      <div style="margin-bottom:1rem;">
+        <label class="form-label" for="group-name-input">Group Name</label>
+        <input type="text" class="input" id="group-name-input" placeholder="e.g. My Wallets" style="max-width:300px;">
       </div>
 
-      <!-- Block Explorers -->
-      <div class="tools-subsection-header" id="links-block-explorers">
-        <h2>🔍 Block Explorers</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://scan.pulsechain.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xa1077a294dde1b09bb078844df40758a5d0f9a27.png" alt="PulseChain Scan logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>PulseChain Scan</h3><p>Official block explorer — track transactions, tokens, and contracts.</p></div>
-        </a>
-        <a class="tools-card" href="https://scan.gigatheminter.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🔎</span>
-          <div class="tools-card-body"><h3>Giga The Minter</h3><p>Alternative PulseChain block explorer.</p></div>
-        </a>
-        <a class="tools-card" href="https://midgard.wtf/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🌐</span>
-          <div class="tools-card-body"><h3>Midgard</h3><p>PulseChain blockchain explorer and analytics tool.</p></div>
-        </a>
-        <a class="tools-card" href="https://otherscan.pulsechain.box/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">📦</span>
-          <div class="tools-card-body"><h3>OtherScan</h3><p>Community-driven block explorer for PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://otter.pulsechain.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🦦</span>
-          <div class="tools-card-body"><h3>OtterScan</h3><p>Fast, lightweight block explorer for PulseChain.</p></div>
-        </a>
-      </div>
-
-      <!-- Bridges -->
-      <div class="tools-subsection-header" id="links-bridges">
-        <h2>🌉 Bridges</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://bridge.pulsechain.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xa1077a294dde1b09bb078844df40758a5d0f9a27.png" alt="PulseChain Bridge logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>PulseChain Bridge</h3><p>Official bridge to move assets between Ethereum and PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://libertyswap.finance/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🗽</span>
-          <div class="tools-card-body"><h3>Liberty Swap</h3><p>Cross-chain bridge and swap aggregator for PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://houdiniswap.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🎩</span>
-          <div class="tools-card-body"><h3>Houdini Swap</h3><p>Privacy-focused cross-chain bridge and swap service.</p></div>
-        </a>
-      </div>
-
-      <!-- Dexs -->
-      <div class="tools-subsection-header" id="links-dexs">
-        <h2>🔄 Dexs</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://app.pulsex.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0x95b303987a60c71504d99aa1b13b4da07b0790ab.png" alt="PLSX logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>PulseX</h3><p>PulseChain's native decentralised exchange — swap tokens instantly.</p></div>
-        </a>
-        <a class="tools-card" href="https://beta.0xtide.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🌊</span>
-          <div class="tools-card-body"><h3>0xTide</h3><p>Automated market maker DEX built for PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://app.9inch.io/swap?chain=pulse" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">📏</span>
-          <div class="tools-card-body"><h3>9inch</h3><p>DEX with farming and advanced features on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://dex.9mm.pro/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🔫</span>
-          <div class="tools-card-body"><h3>9mm</h3><p>Decentralised exchange on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://dex.dextop.pro/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🏔️</span>
-          <div class="tools-card-body"><h3>DexTop</h3><p>Trading DEX for PulseChain tokens.</p></div>
-        </a>
-        <a class="tools-card" href="https://phux.io/#/pulse/trade" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">💧</span>
-          <div class="tools-card-body"><h3>PHUX</h3><p>Balancer-forked weighted pool DEX on PulseChain.</p></div>
-        </a>
-      </div>
-
-      <!-- Farms -->
-      <div class="tools-subsection-header" id="links-farms">
-        <h2>🌾 Farms</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://app.9inch.io/farms?chain=pulsechain" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">📏</span>
-          <div class="tools-card-body"><h3>9inch Farms</h3><p>Yield farming on the 9inch DEX on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://www.daytona.finance/farms" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🏎️</span>
-          <div class="tools-card-body"><h3>Daytona Finance</h3><p>High-yield farming platform on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://helgo.io/dapp" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🌿</span>
-          <div class="tools-card-body"><h3>Helgo</h3><p>Yield farming and DeFi protocol on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://app.hocuspocus.finance/farms" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🎩</span>
-          <div class="tools-card-body"><h3>Hocus Pocus Finance</h3><p>Farming protocol with magic yields on PulseChain.</p></div>
-        </a>
-        <a class="tools-card" href="https://pulselorian.com/yieldFarm" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🚀</span>
-          <div class="tools-card-body"><h3>Pulselorian</h3><p>Yield farming on PulseChain.</p></div>
-        </a>
-      </div>
-
-      <!-- Hex -->
-      <div class="tools-subsection-header" id="links-hex">
-        <h2>💎 Hex</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://hexgraphs.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://hexgraphs.com/favicon.ico" alt="HEX Graphs logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>HEX Graphs</h3><p>Advanced HEX statistics, staking data, and charts.</p></div>
-        </a>
-        <a class="tools-card" href="https://hex.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://hex.com/imgs/HEX-logo.svg" alt="HEX.com logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>HEX.com</h3><p>The official HEX website — stake HEX and earn interest.</p></div>
-        </a>
-      </div>
-
-      <!-- Onramps -->
-      <div class="tools-subsection-header" id="links-onramps">
-        <h2>💳 Onramps</h2>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://app.provex.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://dd.dexscreener.com/ds-data/tokens/pulsechain/0xf6f8db0aba00007681f8faf16a0fda1c9b030b11.png" alt="PRVX logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>ProveX</h3><p>Compliant fiat-to-crypto onramp for PulseChain assets.</p></div>
-        </a>
-        <a class="tools-card" href="https://0xcoast.com/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">🌊</span>
-          <div class="tools-card-body"><h3>0xCoast</h3><p>Buy PLS and PulseChain tokens directly with fiat.</p></div>
-        </a>
-        <a class="tools-card" href="https://changenow.app.link/referral?link_id=87fb8fbefc1ed4" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://changenow.io/favicon.ico" alt="ChangeNow logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>ChangeNow</h3><p>Fast, non-custodial crypto exchange and fiat onramp.</p></div>
-        </a>
-        <a class="tools-card" href="https://tinyurl.com/plsfoliobuy" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon">💸</span>
-          <div class="tools-card-body"><h3>PLSFolio Buy</h3><p>Buy PulseChain tokens via PLSFolio's onramp partner.</p></div>
-        </a>
-      </div>
-
-      <!-- Wallets -->
-      <div class="tools-subsection-header" id="links-wallets">
-        <h2>🪙 Wallets</h2>
-        <p>Recommended wallets for accessing PulseChain and managing your crypto assets.</p>
-      </div>
-      <div class="tools-grid">
-        <a class="tools-card" href="https://metamask.io/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://raw.githubusercontent.com/MetaMask/brand-resources/main/SVG/SVG_MetaMask_Icon_Color.svg" alt="MetaMask logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>MetaMask</h3><p>The most popular EVM-compatible browser wallet. Add PulseChain as a custom network to manage your assets seamlessly.</p></div>
-        </a>
-        <div class="tools-card tools-card-disabled" aria-label="ZKX Wallet — Coming Soon">
-          <span class="tools-card-icon">⚡</span>
-          <div class="tools-card-body"><h3>ZKX Wallet <span class="coming-soon-badge">Coming Soon</span></h3><p>An upcoming privacy-focused wallet purpose-built for PulseChain, bringing zero-knowledge security and a streamlined DeFi experience.</p></div>
+      <div style="margin-bottom:.75rem;">
+        <div class="form-label">Add Wallets</div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem;">
+          <input type="text" class="input" id="group-addr-input" placeholder="0x… address" style="max-width:280px;" autocomplete="off" spellcheck="false">
+          <input type="text" class="input" id="group-label-input" placeholder="Label (optional)" style="max-width:160px;">
+          <button class="btn btn-ghost btn-sm" id="group-add-addr-btn">+ Add</button>
         </div>
-        <a class="tools-card" href="https://internetmoney.io/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://internetmoney.io/favicon.ico" alt="Internet Money Wallet logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>Internet Money Wallet</h3><p>PulseChain-native multi-chain wallet with built-in DEX swaps, NFT support, and passive income via IM and TIME tokens.</p></div>
-        </a>
-        <a class="tools-card" href="https://rabby.io/" target="_blank" rel="noopener noreferrer">
-          <span class="tools-card-icon"><img src="https://rabby.io/favicon.ico" alt="Rabby Wallet logo" loading="lazy"></span>
-          <div class="tools-card-body"><h3>Rabby Wallet</h3><p>Smart EVM wallet with automatic network detection, transaction previews, and risk analysis. Supports PulseChain natively.</p></div>
-        </a>
+        <div id="group-addr-list"></div>
       </div>
 
-    </section>
-
-    <section id="tab-watchlist" class="tab-panel" role="tabpanel" aria-labelledby="btn-watchlist">
-      <div class="section-header">
-        <h1>Watchlist</h1>
-        <p class="section-subtitle">Save tokens by contract address and track their prices — stored locally in your browser.</p>
-      </div>
-
-      <!-- Add token by contract address -->
-      <div class="watchlist-section">
-        <h2 class="watchlist-section-title">➕ Add Token</h2>
-        <div class="wl-add-token-bar">
-          <input
-            id="wl-add-addr"
-            type="text"
-            class="wallet-input"
-            placeholder="Paste contract address (0x…)"
-            autocomplete="off"
-            spellcheck="false"
-            maxlength="42"
-            aria-label="Token contract address"
-          />
-          <button id="wl-add-btn" class="btn btn-primary">
-            <span id="wl-add-btn-text">＋ Add Token</span>
-            <span id="wl-add-spinner" class="spinner hidden" aria-hidden="true"></span>
-          </button>
-        </div>
-        <div id="wl-add-error" class="error-banner hidden" role="alert"></div>
-      </div>
-
-      <!-- Watched tokens -->
-      <div class="watchlist-section">
-        <h2 class="watchlist-section-title">
-          ⭐ Watched Tokens
-          <span class="watchlist-count" id="wl-token-count">0</span>
-          <button id="wl-refresh-btn" class="btn btn-secondary btn-sm" aria-label="Refresh token prices">↻ Refresh prices</button>
-        </h2>
-        <div id="wl-tokens-empty" class="wl-empty">
-          No tokens watched yet. Paste a contract address above or click the <strong>☆</strong> star in the Markets tab.
-        </div>
-
-        <div id="wl-tokens-loading" class="loading-wrap hidden">
-          <div class="pulse-loader" aria-label="Loading token prices"></div>
-          <p>Loading prices…</p>
-        </div>
-
-        <div id="wl-tokens-table-wrap" class="table-wrap hidden">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th class="align-center" aria-label="Reorder"></th>
-                <th>Token</th>
-                <th>Symbol</th>
-                <th class="align-right">Price (USD)</th>
-                <th class="align-right">24 h %</th>
-                <th class="align-right">Volume 24 h</th>
-                <th class="align-right">Market Cap</th>
-                <th class="align-right">Liquidity</th>
-                <th class="align-center" aria-label="Remove"></th>
-              </tr>
-            </thead>
-            <tbody id="wl-tokens-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ===== FOOTER ===== -->
-  <footer class="site-footer">
-    <p>
-      PulseCentral &copy; 2024 — built for the PulseChain community
-    </p>
-  </footer>
-
-  <!-- ===== MANAGE SAVED ADDRESSES & GROUPS MODAL ===== -->
-  <div id="manage-saved-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manage-saved-title">
-    <div class="modal-dialog modal-dialog-wide">
-      <div class="modal-header">
-        <h2 id="manage-saved-title">Edit Saved Addresses &amp; Groups</h2>
-        <button id="manage-saved-close" class="modal-close-btn" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body" id="manage-saved-body">
-
-        <!-- Saved Addresses -->
-        <div class="manage-saved-section">
-          <h3 class="manage-saved-section-title">💼 Saved Addresses</h3>
-          <div id="manage-saved-wallets-list" class="manage-saved-list"></div>
-          <p id="manage-saved-wallets-empty" class="manage-saved-empty hidden">No saved addresses yet.</p>
-        </div>
-
-        <!-- Groups -->
-        <div class="manage-saved-section">
-          <h3 class="manage-saved-section-title">🗂 Groups</h3>
-          <div id="manage-saved-groups-list" class="manage-saved-list"></div>
-          <p id="manage-saved-groups-empty" class="manage-saved-empty hidden">No groups yet. Create one with ＋ New Group.</p>
-        </div>
-
+      <div style="display:flex;gap:.5rem;margin-top:1rem;">
+        <button class="btn btn-primary" id="group-modal-save">Save Group</button>
+        <button class="btn btn-ghost" id="group-modal-cancel">Cancel</button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ===== CREATE / EDIT GROUP MODAL ===== -->
-  <div id="group-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="group-modal-title">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h2 id="group-modal-title">New Portfolio Group</h2>
-        <button id="group-modal-close" class="modal-close-btn" aria-label="Close">&times;</button>
-      </div>
+<!-- ═══════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════ -->
+<script src="/js/trades.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
 
-      <div class="modal-body" id="group-modal-body">
-        <input type="hidden" id="group-id" />
-
-        <!-- Group name -->
-        <div class="form-group">
-          <label for="group-name-input">Group Name *</label>
-          <input id="group-name-input" type="text" class="form-input"
-            placeholder="e.g. My Main Wallets" maxlength="60" autocomplete="off" />
-        </div>
-
-        <!-- Address list -->
-        <div class="form-group">
-          <label>Wallet Addresses</label>
-          <ul id="group-addr-list" class="group-addr-list" aria-label="Addresses in this group"></ul>
-        </div>
-
-        <!-- Add address row -->
-        <div class="form-group">
-          <label for="group-addr-input">Add Address</label>
-          <!-- Pick from saved wallets -->
-          <div class="group-saved-wallets-row" id="group-saved-wallets-row">
-            <select id="group-saved-wallet-select" class="form-input group-saved-select" aria-label="Pick from saved wallets">
-              <option value="">— Pick from saved wallets —</option>
-            </select>
-            <button id="group-add-saved-btn" class="btn btn-secondary btn-sm" type="button">＋ Add Saved</button>
-          </div>
-          <div class="group-add-addr-row">
-            <input id="group-addr-input" type="text" class="form-input"
-              placeholder="0x… wallet address" maxlength="42" autocomplete="off" spellcheck="false" />
-            <input id="group-addr-label-input" type="text" class="form-input"
-              placeholder="Label (optional)" maxlength="40" autocomplete="off" />
-            <button id="group-add-addr-btn" class="btn btn-secondary btn-sm" type="button">＋ Add</button>
-          </div>
-        </div>
-
-        <div id="group-modal-error" class="trade-form-error hidden" role="alert"></div>
-
-        <div class="modal-footer">
-          <button id="group-modal-cancel" class="btn btn-secondary">Cancel</button>
-          <button id="group-modal-save" class="btn btn-primary">Save Group</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== TOKEN DETAILS MODAL ===== -->
-  <div id="token-details-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="token-details-title">
-    <div class="modal-dialog modal-dialog-wide token-details-dialog">
-
-      <div class="modal-header token-details-modal-header">
-        <div class="token-details-header-content">
-          <div id="token-details-logo-wrap" class="token-details-logo-wrap"></div>
-          <div class="token-details-header-info">
-            <h2 id="token-details-title">Token Details</h2>
-            <div id="token-details-sym" class="token-details-sym"></div>
-          </div>
-        </div>
-        <button id="token-details-close" class="modal-close-btn" aria-label="Close">&times;</button>
-      </div>
-
-      <!-- Tab navigation -->
-      <div class="td-tab-nav" role="tablist" aria-label="Token detail sections">
-        <button class="td-tab-btn active" data-td-tab="overview" role="tab" aria-selected="true">📊 Overview</button>
-        <button class="td-tab-btn" data-td-tab="security" role="tab" aria-selected="false">🔒 Security</button>
-        <button class="td-tab-btn" data-td-tab="whales" role="tab" aria-selected="false">🐋 Whale Tracker</button>
-      </div>
-
-      <div class="modal-body token-details-body">
-
-        <!-- Overview tab -->
-        <div id="td-tab-overview" class="td-tab-panel" role="tabpanel"></div>
-
-        <!-- Security tab -->
-        <div id="td-tab-security" class="td-tab-panel hidden" role="tabpanel">
-          <div id="token-details-security-loading" class="loading-wrap hidden">
-            <div class="pulse-loader" aria-label="Loading security data"></div>
-            <p>Analysing token security…</p>
-          </div>
-          <div id="token-details-security-content"></div>
-        </div>
-
-        <!-- Whale Tracker tab -->
-        <div id="td-tab-whales" class="td-tab-panel hidden" role="tabpanel">
-          <div id="token-details-whales-loading" class="loading-wrap hidden">
-            <div class="pulse-loader" aria-label="Loading transfer data"></div>
-            <p>Loading recent transfers…</p>
-          </div>
-          <div id="token-details-whales-content"></div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== USER PROFILE MODAL ===== -->
-  <div id="user-profile-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h2 id="user-profile-title">Profile</h2>
-        <button id="user-profile-close" class="modal-close-btn" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body" id="user-profile-modal-body">
-
-        <!-- Shown when logged out -->
-        <div id="user-profile-auth">
-          <div class="user-auth-tabs" role="tablist" aria-label="Authentication options">
-            <button class="user-auth-tab active" data-auth-tab="login" role="tab" aria-selected="true">Sign In</button>
-            <button class="user-auth-tab" data-auth-tab="register" role="tab" aria-selected="false">Create Account</button>
-          </div>
-
-          <!-- Login form -->
-          <div id="user-auth-login" class="user-auth-panel">
-            <p class="user-profile-hint">Sign in to restore your saved watchlist, portfolio, wallets, and settings.</p>
-            <div class="form-group">
-              <label for="profile-login-username">Username</label>
-              <input id="profile-login-username" type="text" class="form-input" placeholder="Username" autocomplete="username" maxlength="32" required aria-required="true" />
-            </div>
-            <div class="form-group">
-              <label for="profile-login-password">Password</label>
-              <input id="profile-login-password" type="password" class="form-input" placeholder="Password" autocomplete="current-password" maxlength="128" required aria-required="true" />
-            </div>
-            <div id="user-login-error" class="trade-form-error hidden" role="alert"></div>
-            <div class="modal-footer">
-              <button id="user-login-btn" class="btn btn-primary">Sign In</button>
-            </div>
-          </div>
-
-          <!-- Register form -->
-          <div id="user-auth-register" class="user-auth-panel hidden">
-            <p class="user-profile-hint">Create a profile to save your watchlist, portfolio, wallets, themes, and settings across sessions.</p>
-            <div class="form-group">
-              <label for="profile-reg-username">Username</label>
-              <input id="profile-reg-username" type="text" class="form-input" placeholder="Choose a username" autocomplete="username" maxlength="32" required aria-required="true" />
-            </div>
-            <div class="form-group">
-              <label for="profile-reg-password">Password</label>
-              <input id="profile-reg-password" type="password" class="form-input" placeholder="Choose a password" autocomplete="new-password" maxlength="128" required aria-required="true" />
-            </div>
-            <div class="form-group">
-              <label for="profile-reg-password2">Confirm Password</label>
-              <input id="profile-reg-password2" type="password" class="form-input" placeholder="Confirm password" autocomplete="new-password" maxlength="128" required aria-required="true" />
-            </div>
-            <div id="user-register-error" class="trade-form-error hidden" role="alert"></div>
-            <div class="modal-footer">
-              <button id="user-register-btn" class="btn btn-primary">Create Account</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Shown when logged in -->
-        <div id="user-profile-view" class="hidden">
-          <div class="user-profile-info">
-            <svg class="user-profile-avatar" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-            </svg>
-            <div>
-              <div class="user-profile-name" id="user-profile-display-name"></div>
-              <div class="user-profile-sub">Signed in</div>
-            </div>
-          </div>
-          <p class="user-profile-hint">Save your current watchlist tokens, saved wallets, portfolio groups, portfolio history, and theme to your profile — or restore your previously saved data.</p>
-          <div id="user-profile-saved-summary" class="user-profile-saved-summary" aria-label="Saved profile data"></div>
-          <div id="user-profile-feedback" class="user-profile-feedback hidden" role="status" aria-live="polite"></div>
-          <div class="modal-footer">
-            <button id="user-logout-btn" class="btn btn-secondary">Sign Out</button>
-            <button id="user-restore-btn" class="btn btn-secondary">↩ Restore Saved</button>
-            <button id="user-save-btn" class="btn btn-primary">💾 Save Profile</button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
+<!-- Ecosystem tab: populate full cards when loaded -->
+<script>
+  // Wire up ecosystem tab's dedicated elements from the same bridge data
+  document.addEventListener('DOMContentLoaded', () => {
+    // This runs after app.js has loaded. The ecosystem tab uses separate element IDs
+    // that get filled by loadEcosystem() → loadEcosystemStats() on tab switch.
+    const origLoad = window._ecoLoadedFull;
+  });
+</script>
 
 </body>
 </html>
