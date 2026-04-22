@@ -1164,7 +1164,7 @@ input, select, textarea { font-family: var(--font); }
   display: block;
 }
 
-/* ── Markets dropdown nav ────────────────────────────── */
+/* ── Markets dropdown nav — pure CSS hover ───────────── */
 .tab-dropdown-wrap {
   position: relative;
   display: inline-flex;
@@ -1173,31 +1173,36 @@ input, select, textarea { font-family: var(--font); }
   font-size: .6rem;
   margin-left: .25rem;
   opacity: .7;
-  transition: transform .2s;
   display: inline-block;
+  transition: transform .2s;
 }
+/* Show dropdown on hover of the wrapper */
 .tab-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 4px);
+  top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 195px;
+  min-width: 200px;
   background: var(--bg-1);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   box-shadow: 0 12px 32px rgba(0,0,0,.45);
   z-index: 9999;
   overflow: hidden;
+  /* Small top gap so moving mouse from button to menu doesn't close it */
+  margin-top: 4px;
+}
+.tab-dropdown-wrap:hover .tab-dropdown,
+.tab-dropdown-wrap:focus-within .tab-dropdown {
+  display: block;
   animation: dropdownIn .15s ease;
 }
 @keyframes dropdownIn {
   from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.tab-dropdown.open { display: block; }
-.tab-dropdown.open ~ .tab-btn .dropdown-arrow,
-.has-dropdown.active .dropdown-arrow { transform: rotate(180deg); }
+.tab-dropdown-wrap:hover .dropdown-arrow { transform: rotate(180deg); }
 .tab-dropdown-item {
   display: flex;
   align-items: center;

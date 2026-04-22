@@ -336,14 +336,12 @@ const Alerts = (() => {
    TAB NAVIGATION
    ══════════════════════════════════════════════════════ */
 
-// Exclude the markets dropdown-trigger from the generic tab listener
 const tabs = document.querySelectorAll('.tab-btn:not(.modal-tab-btn):not(.has-dropdown)');
 const panels = document.querySelectorAll('.tab-panel');
 let activeTab = 'home';
 
 function switchTab(name) {
   activeTab = name;
-  // Highlight correct nav button (including the has-dropdown one for markets)
   document.querySelectorAll('.tab-btn:not(.modal-tab-btn)').forEach(b => {
     const a = b.dataset.tab === name;
     b.classList.toggle('active', a);
@@ -358,38 +356,21 @@ function switchTab(name) {
   if (name === 'swap')      initSwap();
   if (name === 'trades')    renderTradeLog();
   if (name === 'ecosystem') loadEcosystem();
-  if (name === 'links')     {}  // static
+  if (name === 'links')     {}
 }
 
-// Wire up all non-dropdown tabs normally
 tabs.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 qs('.logo-link')?.addEventListener('click', () => switchTab('home'));
 
-// Markets dropdown — handled separately so it doesn't conflict
-const marketsDropWrap = document.querySelector('.tab-dropdown-wrap');
-const marketsDropMenu = document.getElementById('markets-dropdown');
-const marketsBtn      = marketsDropWrap?.querySelector('.tab-btn.has-dropdown');
+// Markets button click still navigates to markets tab
+const marketsBtn = document.querySelector('.tab-btn.has-dropdown');
+if (marketsBtn) marketsBtn.addEventListener('click', () => switchTab('markets'));
 
-if (marketsBtn && marketsDropMenu) {
-  marketsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    // Switch to markets tab
-    switchTab('markets');
-    // Toggle the dropdown open/closed
-    const isOpen = marketsDropMenu.classList.contains('open');
-    marketsDropMenu.classList.toggle('open', !isOpen);
-  });
-
-  // Clicking a dropdown item closes the menu
-  marketsDropMenu.addEventListener('click', e => e.stopPropagation());
-
-  // Clicking anywhere else closes it
-  document.addEventListener('click', () => marketsDropMenu.classList.remove('open'));
-}
-
+/* ── Markets subtab switching ──────────────────────── */
 let activeMarketsSubtab = 'pulsechain';
 function switchMarketsSubtab(subtab) {
   activeMarketsSubtab = subtab;
+  switchTab('markets');
   document.querySelectorAll('.markets-subtab').forEach(el => {
     el.classList.toggle('hidden', el.id !== `markets-sub-${subtab}`);
     el.classList.toggle('active-subtab', el.id === `markets-sub-${subtab}`);
@@ -397,7 +378,6 @@ function switchMarketsSubtab(subtab) {
   document.querySelectorAll('.tab-dropdown-item').forEach(btn => {
     btn.classList.toggle('active-sub', btn.dataset.subtab === subtab);
   });
-  if (marketsDropMenu) marketsDropMenu.classList.remove('open');
   if (subtab === 'crypto100')   loadCrypto100();
   if (subtab === 'commodities') loadCommodities();
 }
