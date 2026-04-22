@@ -46,17 +46,39 @@
     <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false" aria-controls="tab-watchlist">
       <span aria-hidden="true">⭐</span><span class="tab-label">Watchlist</span>
     </button>
-    <button class="tab-btn" data-tab="swap"      role="tab" aria-selected="false" aria-controls="tab-swap">
-      <span aria-hidden="true">🔄</span><span class="tab-label">Swap</span>
-    </button>
-    <button class="tab-btn" data-tab="trades"    role="tab" aria-selected="false" aria-controls="tab-trades">
-      <span aria-hidden="true">📒</span><span class="tab-label">Trades</span>
-    </button>
+    <div class="tab-dropdown-wrap">
+      <button class="tab-btn has-dropdown" data-tab="swap" role="tab" aria-selected="false" aria-controls="tab-swap" aria-haspopup="true">
+        <span aria-hidden="true">🔄</span><span class="tab-label">Swap</span><span class="dropdown-arrow">▾</span>
+      </button>
+      <div class="tab-dropdown" id="swap-dropdown">
+        <button class="tab-dropdown-item active-sub" data-swaptab="pulsex" onclick="switchSwapSubtab('pulsex')">
+          ⚡ PulseX
+        </button>
+        <button class="tab-dropdown-item" data-swaptab="libertyswap" onclick="switchSwapSubtab('libertyswap')">
+          🗽 LibertySwap
+        </button>
+        <a class="tab-dropdown-item" href="https://pump.tires" target="_blank" rel="noopener">
+          🚀 Pump.Tires ↗
+        </a>
+        <a class="tab-dropdown-item" href="https://provex.io" target="_blank" rel="noopener">
+          🔒 ProveX ↗
+        </a>
+      </div>
+    </div>
     <button class="tab-btn" data-tab="ecosystem" role="tab" aria-selected="false" aria-controls="tab-ecosystem">
       <span aria-hidden="true">🌐</span><span class="tab-label">Ecosystem</span>
     </button>
     <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
       <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
+    </button>
+    <button class="tab-btn" data-tab="markets-stats" role="tab" aria-selected="false" aria-controls="tab-markets-stats">
+      <span class="markets-stats-bar" id="nav-markets-stats">
+        <span class="nav-stat" id="nav-fear-greed">😱 —</span>
+        <span class="nav-stat-sep">·</span>
+        <span class="nav-stat" id="nav-btc-dom">₿ —</span>
+        <span class="nav-stat-sep">·</span>
+        <span class="nav-stat" id="nav-total-mcap">💰 —</span>
+      </span>
     </button>
   </nav>
 
@@ -101,22 +123,6 @@
      ═══════════════════════════════════════════════════ -->
 <div id="tab-home" class="tab-panel active" role="tabpanel" aria-labelledby="tab-home-btn">
   <div class="page">
-
-    <!-- Hero market stats bar -->
-    <div class="home-hero" id="home-hero">
-      <div class="hero-stat" id="hero-fear">
-        <div class="hero-stat-label">Fear &amp; Greed</div>
-        <div class="hero-stat-value" style="font-size:1rem">Loading…</div>
-      </div>
-      <div class="hero-stat" id="hero-btc-dom">
-        <div class="hero-stat-label">BTC Dominance</div>
-        <div class="hero-stat-value">—</div>
-      </div>
-      <div class="hero-stat" id="hero-total-mcap">
-        <div class="hero-stat-label">Total Market Cap</div>
-        <div class="hero-stat-value">—</div>
-      </div>
-    </div>
 
     <!-- Status bar -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
@@ -465,135 +471,33 @@
      ═══════════════════════════════════════════════════ -->
 <div id="tab-swap" class="tab-panel" role="tabpanel">
   <div class="page">
-    <div class="page-title">Swap</div>
-    <div class="page-subtitle">Swap tokens on PulseChain directly below.</div>
 
-    <div class="swap-wrap">
-      <iframe class="swap-iframe" id="swap-iframe"
-              title="PulseX DEX"
-              allow="clipboard-write"
-              loading="lazy"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
-      </iframe>
-
-      <div class="swap-links">
-        <a class="swap-link-chip" href="https://app.piteas.io/#/swap?inputCurrency=PLS" target="_blank" rel="noopener">
-          <img src="https://app.piteas.io/favicon.ico" alt="" onerror="this.style.display='none'">
-          Piteas
-        </a>
-        <a class="swap-link-chip" href="https://9mm.pro/swap" target="_blank" rel="noopener">
-          9mm DEX
-        </a>
-        <a class="swap-link-chip" href="https://libertyswap.finance/swap" target="_blank" rel="noopener">
-          LibertySwap
-        </a>
-        <a class="swap-link-chip" href="https://dexscreener.com/pulsechain" target="_blank" rel="noopener">
-          📈 DexScreener
-        </a>
+    <!-- PulseX sub-tab -->
+    <div id="swap-sub-pulsex" class="swap-subtab active-subtab">
+      <div class="page-title">PulseX</div>
+      <div class="page-subtitle">Swap tokens on PulseChain via PulseX DEX</div>
+      <div class="swap-wrap">
+        <iframe class="swap-iframe" id="swap-iframe"
+                title="PulseX DEX"
+                allow="clipboard-write"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
+        </iframe>
       </div>
     </div>
 
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════
-     TRADE LOG TAB
-     ═══════════════════════════════════════════════════ -->
-<div id="tab-trades" class="tab-panel" role="tabpanel">
-  <div class="page">
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.25rem;flex-wrap:wrap;">
-      <div class="page-title" style="margin-bottom:0;">Trade Log</div>
-      <span class="badge badge-neu" id="trade-count">0</span>
-    </div>
-    <div class="page-subtitle">Track buys &amp; sells, import from your wallet, calculate P&amp;L.</div>
-
-    <!-- P&L summary -->
-    <div class="trades-summary">
-      <div class="summary-card">
-        <div class="summary-label">Realised P&amp;L</div>
-        <div class="summary-value" id="summary-realized">—</div>
+    <!-- LibertySwap sub-tab -->
+    <div id="swap-sub-libertyswap" class="swap-subtab hidden">
+      <div class="page-title">LibertySwap</div>
+      <div class="page-subtitle">Swap &amp; earn yield on LibertySwap</div>
+      <div class="swap-wrap">
+        <iframe class="swap-iframe" id="liberty-iframe"
+                title="LibertySwap"
+                allow="clipboard-write"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
+        </iframe>
       </div>
-      <div class="summary-card">
-        <div class="summary-label">Unrealised P&amp;L</div>
-        <div class="summary-value" id="summary-unrealized">—</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">Tokens Traded</div>
-        <div class="summary-value" id="summary-tokens-traded">0</div>
-      </div>
-    </div>
-
-    <!-- Toolbar -->
-    <div class="trades-toolbar">
-      <button class="btn btn-primary btn-sm" id="add-trade-btn">+ Add Trade</button>
-      <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto;flex-wrap:wrap;">
-        <input type="text" class="input" id="import-addr-input"
-               placeholder="Wallet address to import…"
-               style="max-width:280px;"
-               autocomplete="off" spellcheck="false"
-               aria-label="Wallet address for trade import">
-        <button class="btn btn-ghost btn-sm" id="import-trades-btn">📥 Import from Wallet</button>
-      </div>
-    </div>
-
-    <!-- Add trade form -->
-    <div class="add-trade-card hidden" id="add-trade-panel">
-      <div style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Add Trade</div>
-      <div class="add-trade-grid">
-        <div>
-          <label class="form-label" for="trade-type-select">Type</label>
-          <select class="input select" id="trade-type-select">
-            <option value="buy">Buy</option>
-            <option value="sell">Sell</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label" for="trade-addr-input">Token Address</label>
-          <input type="text" class="input" id="trade-addr-input" placeholder="0x…" autocomplete="off">
-        </div>
-        <div>
-          <label class="form-label" for="trade-sym-input">Symbol</label>
-          <input type="text" class="input" id="trade-sym-input" placeholder="e.g. HEX" autocomplete="off">
-        </div>
-        <div>
-          <label class="form-label" for="trade-amt-input">Token Amount</label>
-          <input type="number" class="input" id="trade-amt-input" placeholder="0" min="0" step="any">
-        </div>
-        <div>
-          <label class="form-label" for="trade-pls-input">PLS Amount</label>
-          <input type="number" class="input" id="trade-pls-input" placeholder="0" min="0" step="any">
-        </div>
-        <div>
-          <label class="form-label" for="trade-date-input">Date &amp; Time</label>
-          <input type="datetime-local" class="input" id="trade-date-input">
-        </div>
-      </div>
-      <div style="margin-top:.75rem;display:flex;gap:.5rem;">
-        <button class="btn btn-primary" id="trade-form-submit">Save Trade</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('add-trade-panel').classList.add('hidden')">Cancel</button>
-      </div>
-    </div>
-
-    <!-- Trade table -->
-    <div class="trade-empty hidden" id="trades-empty">
-      📒 No trades yet. Add a trade manually or import from a wallet address.
-    </div>
-
-    <div class="trade-table-wrap hidden" id="trades-table-wrap">
-      <table class="trade-table" aria-label="Trade log">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Date</th>
-            <th>Token</th>
-            <th class="r">Amount</th>
-            <th class="r">PLS Spent</th>
-            <th class="r">Price/Token</th>
-            <th class="r"></th>
-          </tr>
-        </thead>
-        <tbody id="trades-tbody"></tbody>
-      </table>
     </div>
 
   </div>

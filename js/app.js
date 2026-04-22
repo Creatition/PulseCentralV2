@@ -341,6 +341,8 @@ const panels = document.querySelectorAll('.tab-panel');
 let activeTab = 'home';
 
 function switchTab(name) {
+  // market-stats is display-only in nav, not a real tab panel
+  if (name === 'markets-stats') return;
   activeTab = name;
   document.querySelectorAll('.tab-btn:not(.modal-tab-btn)').forEach(b => {
     const a = b.dataset.tab === name;
@@ -354,7 +356,6 @@ function switchTab(name) {
   if (name === 'portfolio') initPortfolioTab();
   if (name === 'watchlist') loadWatchlistTab();
   if (name === 'swap')      initSwap();
-  if (name === 'trades')    renderTradeLog();
   if (name === 'ecosystem') loadEcosystem();
   if (name === 'links')     {}
 }
@@ -362,9 +363,45 @@ function switchTab(name) {
 tabs.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 qs('.logo-link')?.addEventListener('click', () => switchTab('home'));
 
-// Markets button click still navigates to markets tab
-const marketsBtn = document.querySelector('.tab-btn.has-dropdown');
+// Markets button dropdown
+const marketsBtn = document.querySelector('.tab-btn.has-dropdown[data-tab="markets"]');
 if (marketsBtn) marketsBtn.addEventListener('click', () => switchTab('markets'));
+
+// Swap dropdown setup
+const swapDropMenu = document.getElementById('swap-dropdown');
+const swapBtn      = document.querySelector('.tab-btn.has-dropdown[data-tab="swap"]');
+if (swapBtn) swapBtn.addEventListener('click', () => switchTab('swap'));
+
+// Close swap dropdown on outside mousedown
+document.addEventListener('mousedown', (e) => {
+  if (swapDropMenu && swapBtn) {
+    if (!swapDropMenu.contains(e.target) && !swapBtn.contains(e.target)) {
+      swapDropMenu.style.display = '';
+    }
+  }
+  const marketsDropMenu = document.getElementById('markets-dropdown');
+  if (marketsDropMenu && marketsBtn) {
+    if (!marketsDropMenu.contains(e.target) && !marketsBtn.contains(e.target)) {
+      marketsDropMenu.style.display = '';
+    }
+  }
+});
+
+/* ── Swap sub-tab switching ──────────────────────── */
+let activeSwapSubtab = 'pulsex';
+function switchSwapSubtab(subtab) {
+  activeSwapSubtab = subtab;
+  switchTab('swap');
+  document.querySelectorAll('.swap-subtab').forEach(el => {
+    el.classList.toggle('hidden', el.id !== `swap-sub-${subtab}`);
+    el.classList.toggle('active-subtab', el.id === `swap-sub-${subtab}`);
+  });
+  document.querySelectorAll('[data-swaptab]').forEach(btn => {
+    btn.classList.toggle('active-sub', btn.dataset.swaptab === subtab);
+  });
+  initSwap();
+}
+window.switchSwapSubtab = switchSwapSubtab;
 
 /* ── Markets subtab switching ──────────────────────── */
 let activeMarketsSubtab = 'pulsechain';
@@ -539,9 +576,16 @@ tickerTimer = setInterval(loadTicker, 5 * 60_000);
 function renderBellBadge() {
   const n = Alerts.getUnread();
   const badge = $('bell-badge');
+  const btn   = $('bell-btn');
   if (!badge) return;
-  if (n > 0) { badge.textContent = n > 99 ? '99+' : n; show(badge); }
-  else hide(badge);
+  if (n > 0) {
+    badge.textContent = n > 99 ? '99+' : String(n);
+    show(badge);
+    if (btn) btn.setAttribute('aria-label', `Price alerts (${n} unread)`);
+  } else {
+    hide(badge);
+    if (btn) btn.setAttribute('aria-label', 'Price alerts');
+  }
 }
 
 function renderAlertsDropdown() {
@@ -838,8 +882,9 @@ async function loadEcosystemStats() {
     const entry = fear.value?.data?.[0];
     if (entry) {
       const label = `${entry.value} — ${entry.value_classification}`;
-      const heroFear = $('hero-fear');
-      if (heroFear) heroFear.querySelector('.hero-stat-value').textContent = label;
+      // Update nav stats bar
+      const navFear = $('nav-fear-greed');
+      if (navFear) navFear.textContent = `😱 ${entry.value}`;
       setText('eco-fear-value', label);
     }
   }
@@ -849,12 +894,12 @@ async function loadEcosystemStats() {
     const d = global_.value?.data;
     if (d) {
       const btcDomText = (d.market_cap_percentage?.btc || 0).toFixed(1) + '%';
-      const herobtc = $('hero-btc-dom');
-      if (herobtc) herobtc.querySelector('.hero-stat-value').textContent = btcDomText;
+      const navBtc = $('nav-btc-dom');
+      if (navBtc) navBtc.textContent = `₿ ${btcDomText}`;
       setText('eco-btc-dom', btcDomText);
       const mcap = fmt.large(d.total_market_cap?.usd);
-      const heroMcap = $('hero-total-mcap');
-      if (heroMcap) heroMcap.querySelector('.hero-stat-value').textContent = mcap;
+      const navMcap = $('nav-total-mcap');
+      if (navMcap) navMcap.textContent = `💰 ${mcap}`;
       setText('eco-total-mcap', mcap);
       setText('eco-total-vol', fmt.large(d.total_volume?.usd));
     }
@@ -1051,10 +1096,11 @@ function renderCrypto100(coins) {
   coins.forEach((coin, i) => {
     const chg24 = fmt.change(coin.price_change_percentage_24h);
     const chg7d = fmt.change(coin.price_change_percentage_7d_in_currency);
-    const row = document.createElement('a');
+
+    const row = document.createElement('div');
     row.className = 'market-row crypto100-row';
-    row.href = `https://www.coingecko.com/en/coins/${coin.id}`;
-    row.target = '_blank'; row.rel = 'noopener';
+    row.style.cursor = 'pointer';
+    row.onclick = () => window.open(`https://www.coingecko.com/en/coins/${coin.id}`, '_blank', 'noopener');
 
     const rank = document.createElement('span');
     rank.className = 'market-rank';
@@ -1069,7 +1115,23 @@ function renderCrypto100(coins) {
     img.onerror = () => { img.style.display='none'; };
     const nameWrap = document.createElement('div');
     nameWrap.innerHTML = `<div class="market-token-name">${escHtml(coin.name || '—')}</div><div class="market-token-sym">${escHtml((coin.symbol||'').toUpperCase())}</div>`;
-    tokenCol.append(img, nameWrap);
+
+    // Watchlist star — uses coin id as a pseudo-address for CG coins
+    const cgAddr = `cg:${coin.id}`;
+    const star = document.createElement('button');
+    star.className = `star-btn${Watchlist.hasToken(cgAddr) ? ' active' : ''}`;
+    star.style.cssText = 'margin-left:.25rem;width:28px;height:28px;font-size:1rem;';
+    star.textContent = Watchlist.hasToken(cgAddr) ? '★' : '☆';
+    star.onclick = e => {
+      e.stopPropagation();
+      if (Watchlist.hasToken(cgAddr)) {
+        Watchlist.removeToken(cgAddr); star.textContent = '☆'; star.classList.remove('active');
+      } else {
+        Watchlist.addToken({ address: cgAddr, symbol: (coin.symbol||'').toUpperCase(), name: coin.name || '', logoUrl: coin.image || '' });
+        star.textContent = '★'; star.classList.add('active');
+      }
+    };
+    tokenCol.append(img, nameWrap, star);
 
     const mkCol = (val, cls = '') => {
       const s = document.createElement('span');
@@ -2123,11 +2185,21 @@ async function addWatchlistToken() {
    ══════════════════════════════════════════════════════ */
 
 let swapInited = false;
+let libertyInited = false;
 function initSwap() {
-  if (swapInited) return;
-  swapInited = true;
-  const iframe = $('swap-iframe');
-  if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
+  if (activeSwapSubtab === 'libertyswap') {
+    if (!libertyInited) {
+      libertyInited = true;
+      const iframe = $('liberty-iframe');
+      if (iframe) iframe.src = 'https://libertyswap.finance/swap';
+    }
+  } else {
+    if (!swapInited) {
+      swapInited = true;
+      const iframe = $('swap-iframe');
+      if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════

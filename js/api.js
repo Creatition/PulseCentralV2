@@ -23,7 +23,8 @@ const API = (() => {
 
   /* ── Core coins shown on Home tab ────────────────── */
   const CORE_COINS = [
-    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0xe56043671df55de5cdf8459710433c10324de0ae', color: '#7b2fff' },
+    // PLS pair: WPLS/USDC on PulseX — shows PLS price in USD correctly (PLS is base token)
+    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0x6753560538eca67617a9ce605178f788be7e524e', color: '#7b2fff' },
     { symbol: 'PLSX', address: '0x95B303987A60C71504D99Aa1b13B4DA07b0790ab', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9', color: '#ff6d00' },
     { symbol: 'HEX',  address: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39', pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65', color: '#e8002d' },
     { symbol: 'INC',  address: '0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d', pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa', color: '#00e676' },
