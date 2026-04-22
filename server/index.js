@@ -138,6 +138,27 @@ app.get('/api/llama/protocol/:slug', (req, res) => {
   proxy(res, `https://api.llama.fi/protocol/${slug}`);
 });
 
+// ── LibertySwap API ────────────────────────────────
+app.get('/api/libertyswap/*', async (req, res) => {
+  const p = sanitise(req.params[0]);
+  if (!p) return res.status(400).json({ error: 'Bad path' });
+  const url = `https://api.libertyswap.finance/${p}${qs(req)}`;
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch { return res.status(502).json({ error: 'LibertySwap returned non-JSON' }); }
+    res.setHeader('Content-Type', 'application/json');
+    res.json(data);
+  } catch (err) {
+    console.error('[libertyswap]', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // ── GoPlus security (confirmed working) ───────────────
 app.get('/api/goplus/*', (req, res) => {
   const p = sanitise(req.params[0]);
@@ -392,7 +413,20 @@ async function buildSnapshot() {
   const coins    = {};
   await Promise.all(SNAPSHOT_COINS.map(async ({ symbol, pair }) => {
     try {
-      coins[symbol] = await fetchGeckoBars(pair);
+      let bars = await fetchGeckoBars(pair);
+      // PLS pair (E56043) has DAI as base token — invert to get PLS price in USD
+      if (symbol === 'PLS') {
+        bars = bars
+          .map(b => ({
+            ...b,
+            open:  b.open  > 0 ? 1 / b.open  : 0,
+            high:  b.low   > 0 ? 1 / b.low   : 0,
+            low:   b.high  > 0 ? 1 / b.high  : 0,
+            close: b.close > 0 ? 1 / b.close : 0,
+          }))
+          .filter(b => b.close > 0 && b.close < 1);
+      }
+      coins[symbol] = bars;
       console.log(`[snapshot] ${symbol}: ${coins[symbol].length} bars`);
     } catch (err) {
       console.error(`[snapshot] ${symbol} failed:`, err.message);

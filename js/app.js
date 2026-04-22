@@ -2248,6 +2248,43 @@ async function addWatchlistToken() {
 
 let swapInited = false;
 let libertyInited = false;
+let libertyStatsLoaded = false;
+
+async function loadLibertyStats(force = false) {
+  if (libertyStatsLoaded && !force) return;
+  libertyStatsLoaded = true;
+  const errEl = $('liberty-error');
+  if (errEl) hide(errEl);
+  try {
+    // Try common LibertySwap API endpoints
+    const [statsRes, poolsRes] = await Promise.allSettled([
+      fetch('/api/libertyswap/v1/stats').then(r => r.json()).catch(() => null),
+      fetch('/api/libertyswap/v1/pools').then(r => r.json()).catch(() => null),
+    ]);
+
+    const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
+    const pools = poolsRes.status === 'fulfilled' ? poolsRes.value : null;
+
+    const setVal = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+
+    if (stats && !stats.error) {
+      setVal('lib-tvl',   stats.tvlUSD   ? fmt.large(stats.tvlUSD)   : (stats.tvl   ? fmt.large(stats.tvl)   : '—'));
+      setVal('lib-vol',   stats.volumeUSD ? fmt.large(stats.volumeUSD) : (stats.volume24h ? fmt.large(stats.volume24h) : '—'));
+      setVal('lib-fees',  stats.feesUSD  ? fmt.large(stats.feesUSD)  : (stats.fees24h  ? fmt.large(stats.fees24h)  : '—'));
+    }
+    if (pools && !pools.error) {
+      const poolCount = Array.isArray(pools) ? pools.length : (pools.pools?.length || pools.count || '—');
+      setVal('lib-pools', poolCount);
+      setVal('lib-pairs', poolCount);
+    }
+  } catch (e) {
+    const errEl = $('liberty-error');
+    if (errEl) { errEl.textContent = `Stats unavailable: ${e.message}`; show(errEl); }
+  }
+}
+
+$('liberty-refresh-btn')?.addEventListener('click', () => { libertyStatsLoaded = false; loadLibertyStats(true); });
+
 function initSwap() {
   if (activeSwapSubtab === 'libertyswap') {
     if (!libertyInited) {
@@ -2255,6 +2292,7 @@ function initSwap() {
       const iframe = $('liberty-iframe');
       if (iframe) iframe.src = 'https://libertyswap.finance/';
     }
+    loadLibertyStats();
   } else {
     if (!swapInited) {
       swapInited = true;

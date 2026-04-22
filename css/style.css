@@ -1587,3 +1587,68 @@ a.commodity-card:hover {
   border: 2px solid var(--bg-0, #09090f);
 }
 .bell-wrap { position: relative; }
+
+/* ── Nav stat tooltips ────────────────────────────────── */
+.nav-stat-tip {
+  position: relative;
+  cursor: default;
+}
+.nav-stat-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-1);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: .3rem .6rem;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+  z-index: 9999;
+}
+.nav-stat-tip:hover::after {
+  opacity: 1;
+}
+
+/* ── LibertySwap stats bar ───────────────────────────── */
+.liberty-stats-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.liberty-stat {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.liberty-stat-label {
+  font-size: .68rem;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-weight: 600;
+}
+.liberty-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+/* ── Watchlist uses market-row - ensure consistent with 7-col grid ── */
+#wl-rows .market-row { cursor: pointer; }
+#wl-rows .market-row .star-btn {
+  width: 24px; height: 24px; font-size: .85rem;
+}

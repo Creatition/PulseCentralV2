@@ -164,15 +164,16 @@ const API = (() => {
   /**
    * Fetch daily OHLCV bars from GeckoTerminal.
    * Returns bars with time in MILLISECONDS, sorted oldest→newest.
-   * GeckoTerminal is confirmed working; returns timestamps in seconds.
+   * invertPrices: set true when pool has quote=WPLS and base=stablecoin,
+   * so we get PLS price (1/close) instead of stablecoin price.
    */
-  async function getChartBars(pairAddress) {
+  async function getChartBars(pairAddress, invertPrices = false) {
     const url  = `${GECKO}/${pairAddress}/ohlcv/day?aggregate=1&limit=1000&currency=usd`;
     const data = await get(url, 15000);
     const raw  = data?.data?.attributes?.ohlcv_list || [];
-    return raw
+    const bars = raw
       .map(b => ({
-        time:   b[0] > 1e10 ? b[0] : b[0] * 1000, // seconds → ms
+        time:   b[0] > 1e10 ? b[0] : b[0] * 1000,
         open:   Number(b[1] || 0),
         high:   Number(b[2] || 0),
         low:    Number(b[3] || 0),
@@ -181,6 +182,22 @@ const API = (() => {
       }))
       .filter(b => b.time > 0 && b.close > 0)
       .sort((a, b) => a.time - b.time);
+
+    if (!invertPrices) return bars;
+
+    // When DAI/stablecoin is the base token, close ≈ 1 (DAI price in USD).
+    // Invert to get WPLS price: PLS_USD = 1 / (WPLS_per_DAI)
+    // GeckoTerminal ohlcv with currency=usd for a DAI/WPLS pool returns close in USD of the base (DAI)
+    // but the actual ratio field gives us DAI-per-WPLS. We want WPLS-per-DAI → invert.
+    return bars
+      .map(b => ({
+        ...b,
+        open:  b.open  > 0 ? 1 / b.open  : 0,
+        high:  b.low   > 0 ? 1 / b.low   : 0,   // inverted: low becomes high
+        low:   b.high  > 0 ? 1 / b.high  : 0,   // inverted: high becomes low
+        close: b.close > 0 ? 1 / b.close : 0,
+      }))
+      .filter(b => b.close > 0 && b.close < 1); // PLS < $1 sanity check
   }
 
   /* ── Core coins (Home tab) ────────────────────────── */
@@ -198,9 +215,12 @@ const API = (() => {
     }
 
     // Fetch live bars for ALL core coins from GeckoTerminal (limit=1000 = ~2.7 years, covers PulseChain launch)
-    // Run in parallel — each returns full history from day 1
+    // PLS pair is E56043 (DAI/WPLS) — DAI is base so prices are inverted, need invertPrices=true
     const barResults = await Promise.allSettled(
-      CORE_COINS.map(coin => getChartBars(coin.pair))
+      CORE_COINS.map(coin => {
+        const isPLS = coin.symbol === 'PLS';
+        return getChartBars(coin.pair, isPLS); // invert PLS bars since DAI is base token
+      })
     );
 
     return CORE_COINS.map((coin, i) => {
