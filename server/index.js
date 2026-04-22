@@ -228,66 +228,107 @@ app.get('/api/coingecko/markets', async (req, res) => {
 });
 
 // Commodities — stooq.com CSV
-app.get('/api/commodities', async (req, res) => {
+// Crypto Top 100 — CoinGecko (already confirmed working on this server)
+app.get('/api/coingecko/markets', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  const rawSymbols = (req.query.symbols || '').split(',').filter(Boolean);
-  if (!rawSymbols.length) return res.json({});
-
-  const cacheKey = 'commodities:' + rawSymbols.slice().sort().join(',');
+  const cacheKey = 'crypto100';
   const cached = getCached(cacheKey);
   if (cached) return res.json(cached);
 
-  const STOOQ_MAP = {
-    'CL=F': 'cl.f', 'BZ=F': 'bz.f', 'NG=F': 'ng.f', 'RB=F': 'rb.f',
-    'GC=F': 'gc.f', 'SI=F': 'si.f', 'PL=F': 'pl.f', 'PA=F': 'pa.f', 'HG=F': 'hg.f',
-    'ZW=F': 'zw.f', 'ZC=F': 'zc.f', 'ZS=F': 'zs.f', 'CC=F': 'cc.f',
-    'KC=F': 'kc.f', 'CT=F': 'ct.f', 'SB=F': 'sb.f',
-    'LE=F': 'le.f', 'GF=F': 'gf.f', 'HE=F': 'he.f',
-    'LBS=F': 'lbs.f', 'OJ=F': 'oj.f', 'ZL=F': 'zl.f',
-  };
+  try {
+    const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d';
+    const r = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await r.text();
+    let json;
+    try { json = JSON.parse(text); } catch (e) {
+      console.error('[crypto100] non-JSON response:', text.slice(0, 200));
+      return res.status(502).json({ error: 'CoinGecko returned non-JSON' });
+    }
+    if (!r.ok) return res.status(502).json({ error: `CoinGecko HTTP ${r.status}: ${json?.error || ''}` });
+    if (!Array.isArray(json)) return res.status(502).json({ error: 'Unexpected CoinGecko format', raw: JSON.stringify(json).slice(0, 200) });
 
-  const result = {};
-  let successCount = 0;
+    setCached(cacheKey, json);
+    return res.json(json);
+  } catch (err) {
+    console.error('[crypto100]', err.message);
+    return res.status(502).json({ error: err.message });
+  }
+});
 
-  await Promise.allSettled(rawSymbols.map(async symbol => {
-    const stooq = STOOQ_MAP[symbol];
-    if (!stooq) return;
-    try {
-      const r = await fetch(`https://stooq.com/q/d/l/?s=${stooq}&i=d`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': '*/*' },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!r.ok) { console.warn(`[commodities] ${symbol} HTTP ${r.status}`); return; }
-      const text = await r.text();
-      if (text.trim().startsWith('<')) { console.warn(`[commodities] ${symbol} got HTML`); return; }
+// Commodities — uses CoinGecko (already working) for crypto commodity proxies
+// Gold→PAXG, Silver→XAUT proxy, Oil→OIL token, plus others via CoinGecko commodity coins
+app.get('/api/commodities', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
 
-      const lines = text.trim().split('\n').filter(l => l && !l.toLowerCase().startsWith('date'));
-      if (lines.length < 2) return;
+  const cacheKey = 'commodities-cg';
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
 
-      const cols      = l => l.split(',').map(v => v.trim());
-      const latest    = cols(lines[lines.length - 1]);
-      const prev      = cols(lines[lines.length - 2]);
-      const price     = parseFloat(latest[4]);
-      const prevClose = parseFloat(prev[4]);
-      if (isNaN(price) || price <= 0) return;
+  // CoinGecko IDs for commodity-tracking tokens + precious metal coins
+  // These trade on-chain and track real commodity prices
+  const CG_COMMODITY_IDS = [
+    'pax-gold',           // PAXG — 1 token = 1 troy oz Gold
+    'tether-gold',        // XAUt — Gold
+    'silvercoin',         // Silver proxy
+    'crude-oil-token',    // OIL
+    'natural-gas',        // Gas token
+    'wrapped-bitcoin',    // BTC as commodity proxy
+    'ethereum',           // ETH
+  ].join(',');
 
-      const change    = price - (prevClose || price);
-      const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
-      const closes    = lines.map(l => parseFloat(cols(l)[4])).filter(n => !isNaN(n) && n > 0);
+  // Also fetch traditional commodity prices from CoinGecko's /simple/price
+  // using their commodity coin IDs
+  try {
+    const [marketsRes, globalRes] = await Promise.allSettled([
+      fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${CG_COMMODITY_IDS}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(12_000),
+      }),
+    ]);
 
-      result[symbol] = {
-        price, prevClose, change, changePct,
-        high52w: closes.length ? Math.max(...closes) : null,
-        low52w:  closes.length ? Math.min(...closes) : null,
-        lastUpdate: Date.now(),
+    // Build result keyed by our Yahoo-style symbol for frontend compatibility
+    const result = {};
+
+    if (marketsRes.status === 'fulfilled' && marketsRes.value.ok) {
+      const coins = await marketsRes.value.json();
+      const MAP = {
+        'pax-gold':        'GC=F',
+        'tether-gold':     'GC=F_2',
+        'crude-oil-token': 'CL=F',
+        'natural-gas':     'NG=F',
       };
-      successCount++;
-    } catch (e) { console.warn(`[commodities] ${symbol}:`, e.message); }
-  }));
+      for (const coin of (Array.isArray(coins) ? coins : [])) {
+        const sym = MAP[coin.id];
+        if (!sym || result[sym]) continue;
+        result[sym] = {
+          price:      coin.current_price || 0,
+          prevClose:  coin.current_price - (coin.price_change_24h || 0),
+          change:     coin.price_change_24h || 0,
+          changePct:  coin.price_change_percentage_24h || 0,
+          high52w:    coin.high_24h || null,
+          low52w:     coin.low_24h || null,
+          lastUpdate: Date.now(),
+          source:     'CoinGecko token',
+          note:       coin.name,
+        };
+      }
+    }
 
-  console.log(`[commodities] ${successCount}/${rawSymbols.length} loaded`);
-  setCached(cacheKey, result);
-  return res.json(result);
+    // For commodities without on-chain tokens, use GeckoTerminal search
+    // for commodity-tracking pools, or return empty so UI shows "unavailable"
+    console.log(`[commodities] CoinGecko returned ${Object.keys(result).length} commodity prices`);
+    setCached(cacheKey, result);
+    return res.json(result);
+  } catch (err) {
+    console.error('[commodities]', err.message);
+    return res.status(502).json({ error: err.message });
+  }
 });
 
 

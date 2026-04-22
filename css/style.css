@@ -1499,3 +1499,19 @@ input, select, textarea { font-family: var(--font); }
   color: var(--text-3);
   font-family: var(--mono);
 }
+
+/* Commodity token image */
+.commodity-img {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-2);
+}
+/* Commodity link cards get hover effect */
+a.commodity-card:hover {
+  border-color: var(--primary);
+  background: var(--bg-2);
+  text-decoration: none;
+  color: var(--text);
+}
