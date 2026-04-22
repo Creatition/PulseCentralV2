@@ -1026,8 +1026,11 @@ async function loadCrypto100(forceRefresh = false) {
   show(loading); hide(error); hide(list);
   if (btn) { btn.disabled = true; btn.textContent = '↻ …'; }
   try {
-    const data = await fetch('/api/coingecko/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d').then(r => r.json());
-    if (!Array.isArray(data)) throw new Error('Invalid response from CoinGecko');
+    const res  = await fetch('/api/coingecko/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d');
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error('Server returned non-JSON — restart the server with: npm start'); }
+    if (!Array.isArray(data)) throw new Error(data?.error || 'Invalid response from server');
     hide(loading);
     renderCrypto100(data);
     show(list);
@@ -1137,7 +1140,10 @@ async function loadCommodities(forceRefresh = false) {
 
   try {
     const symbols = COMMODITIES.map(c => c.id).join(',');
-    const data = await fetch(`/api/commodities?symbols=${encodeURIComponent(symbols)}`).then(r => r.json());
+    const res  = await fetch(`/api/commodities?symbols=${encodeURIComponent(symbols)}`);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error('Server returned non-JSON — restart the server with: npm start'); }
 
     commodityData = COMMODITIES.map(c => {
       const q = data[c.id] || {};

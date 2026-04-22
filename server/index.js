@@ -179,44 +179,57 @@ app.get('/api/coingecko/global', (req, res) => {
   proxy(res, 'https://api.coingecko.com/api/v3/global');
 });
 
-// Crypto Top 100 — use CoinCap API (free, no auth, reliable)
+// Crypto Top 100 — tries CoinCap first, falls back to CoinGecko
 app.get('/api/coingecko/markets', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   const cacheKey = 'crypto100';
   const cached = getCached(cacheKey);
   if (cached) return res.json(cached);
 
+  // Try CoinCap v2
   try {
     const r = await fetch('https://api.coincap.io/v2/assets?limit=100', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(15_000),
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(12_000),
     });
-    if (!r.ok) throw new Error(`CoinCap HTTP ${r.status}`);
-    const data = await r.json();
+    const text = await r.text();
+    const json = JSON.parse(text);
+    if (Array.isArray(json.data) && json.data.length > 0) {
+      const mapped = json.data.map((c, i) => ({
+        id: c.id, symbol: c.symbol, name: c.name,
+        image: `https://assets.coincap.io/assets/icons/${(c.symbol||'').toLowerCase()}@2x.png`,
+        current_price: parseFloat(c.priceUsd) || 0,
+        market_cap: parseFloat(c.marketCapUsd) || 0,
+        market_cap_rank: i + 1,
+        total_volume: parseFloat(c.volumeUsd24Hr) || 0,
+        price_change_percentage_24h: parseFloat(c.changePercent24Hr) || 0,
+        price_change_percentage_7d_in_currency: 0,
+      }));
+      setCached(cacheKey, mapped);
+      return res.json(mapped);
+    }
+  } catch (e) { console.warn('[crypto100] CoinCap failed:', e.message); }
 
-    // Map CoinCap format to CoinGecko-compatible format the frontend expects
-    const mapped = (data.data || []).map((c, i) => ({
-      id:                                    c.id,
-      symbol:                                c.symbol,
-      name:                                  c.name,
-      image:                                 `https://assets.coincap.io/assets/icons/${c.symbol?.toLowerCase()}@2x.png`,
-      current_price:                         Number(c.priceUsd) || 0,
-      market_cap:                            Number(c.marketCapUsd) || 0,
-      market_cap_rank:                       i + 1,
-      total_volume:                          Number(c.volumeUsd24Hr) || 0,
-      price_change_percentage_24h:           Number(c.changePercent24Hr) || 0,
-      price_change_percentage_7d_in_currency: 0,
-    }));
+  // Fallback: CoinGecko public (no key)
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false', {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    const text = await r.text();
+    const json = JSON.parse(text);
+    if (Array.isArray(json) && json.length > 0) {
+      setCached(cacheKey, json);
+      return res.json(json);
+    }
+  } catch (e) { console.warn('[crypto100] CoinGecko failed:', e.message); }
 
-    setCached(cacheKey, mapped);
-    res.json(mapped);
-  } catch (err) {
-    console.error('[crypto100]', err.message);
-    res.status(502).json({ error: err.message });
-  }
+  return res.status(502).json({ error: 'All crypto data sources failed. Try again in a moment.' });
 });
 
-// Commodities — use stooq.com CSV (reliable, no auth needed)
+// Commodities — stooq.com CSV
 app.get('/api/commodities', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   const rawSymbols = (req.query.symbols || '').split(',').filter(Boolean);
   if (!rawSymbols.length) return res.json({});
 
@@ -224,74 +237,59 @@ app.get('/api/commodities', async (req, res) => {
   const cached = getCached(cacheKey);
   if (cached) return res.json(cached);
 
-  const result = {};
-
-  // Map our Yahoo symbols to stooq symbols
   const STOOQ_MAP = {
-    'CL=F':  'cl.f',   // WTI Crude
-    'BZ=F':  'bz.f',   // Brent
-    'NG=F':  'ng.f',   // Natural Gas
-    'RB=F':  'rb.f',   // Gasoline
-    'GC=F':  'gc.f',   // Gold
-    'SI=F':  'si.f',   // Silver
-    'PL=F':  'pl.f',   // Platinum
-    'PA=F':  'pa.f',   // Palladium
-    'HG=F':  'hg.f',   // Copper
-    'ZW=F':  'zw.f',   // Wheat
-    'ZC=F':  'zc.f',   // Corn
-    'ZS=F':  'zs.f',   // Soybeans
-    'CC=F':  'cc.f',   // Cocoa
-    'KC=F':  'kc.f',   // Coffee
-    'CT=F':  'ct.f',   // Cotton
-    'SB=F':  'sb.f',   // Sugar
-    'LE=F':  'le.f',   // Live Cattle
-    'GF=F':  'gf.f',   // Feeder Cattle
-    'HE=F':  'he.f',   // Lean Hogs
-    'LBS=F': 'lbs.f',  // Lumber
-    'OJ=F':  'oj.f',   // OJ
-    'ZL=F':  'zl.f',   // Soybean Oil
+    'CL=F': 'cl.f', 'BZ=F': 'bz.f', 'NG=F': 'ng.f', 'RB=F': 'rb.f',
+    'GC=F': 'gc.f', 'SI=F': 'si.f', 'PL=F': 'pl.f', 'PA=F': 'pa.f', 'HG=F': 'hg.f',
+    'ZW=F': 'zw.f', 'ZC=F': 'zc.f', 'ZS=F': 'zs.f', 'CC=F': 'cc.f',
+    'KC=F': 'kc.f', 'CT=F': 'ct.f', 'SB=F': 'sb.f',
+    'LE=F': 'le.f', 'GF=F': 'gf.f', 'HE=F': 'he.f',
+    'LBS=F': 'lbs.f', 'OJ=F': 'oj.f', 'ZL=F': 'zl.f',
   };
 
+  const result = {};
+  let successCount = 0;
+
   await Promise.allSettled(rawSymbols.map(async symbol => {
+    const stooq = STOOQ_MAP[symbol];
+    if (!stooq) return;
     try {
-      const stooq = STOOQ_MAP[symbol];
-      if (!stooq) return;
-
-      const url = `https://stooq.com/q/d/l/?s=${stooq}&i=d`;
-      const r = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
-        signal: AbortSignal.timeout(8_000),
+      const r = await fetch(`https://stooq.com/q/d/l/?s=${stooq}&i=d`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': '*/*' },
+        signal: AbortSignal.timeout(10_000),
       });
-      if (!r.ok) return;
+      if (!r.ok) { console.warn(`[commodities] ${symbol} HTTP ${r.status}`); return; }
       const text = await r.text();
+      if (text.trim().startsWith('<')) { console.warn(`[commodities] ${symbol} got HTML`); return; }
 
-      // Parse CSV: Date,Open,High,Low,Close,Volume
-      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      const lines = text.trim().split('\n').filter(l => l && !l.toLowerCase().startsWith('date'));
       if (lines.length < 2) return;
 
-      const latest   = lines[lines.length - 1].split(',');
-      const prev     = lines[lines.length - 2].split(',');
-      const price    = parseFloat(latest[4]);  // Close
-      const prevClose= parseFloat(prev[4]);    // Previous close
-      if (isNaN(price)) return;
+      const cols      = l => l.split(',').map(v => v.trim());
+      const latest    = cols(lines[lines.length - 1]);
+      const prev      = cols(lines[lines.length - 2]);
+      const price     = parseFloat(latest[4]);
+      const prevClose = parseFloat(prev[4]);
+      if (isNaN(price) || price <= 0) return;
 
-      const change    = price - prevClose;
+      const change    = price - (prevClose || price);
       const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+      const closes    = lines.map(l => parseFloat(cols(l)[4])).filter(n => !isNaN(n) && n > 0);
 
-      // Get 52w high/low from all rows
-      const closes = lines.map(l => parseFloat(l.split(',')[4])).filter(n => !isNaN(n));
-      const high52w = Math.max(...closes);
-      const low52w  = Math.min(...closes);
-
-      result[symbol] = { price, prevClose, change, changePct, high52w, low52w, lastUpdate: Date.now() };
-    } catch (e) {
-      console.warn(`[commodities] ${symbol} failed:`, e.message);
-    }
+      result[symbol] = {
+        price, prevClose, change, changePct,
+        high52w: closes.length ? Math.max(...closes) : null,
+        low52w:  closes.length ? Math.min(...closes) : null,
+        lastUpdate: Date.now(),
+      };
+      successCount++;
+    } catch (e) { console.warn(`[commodities] ${symbol}:`, e.message); }
   }));
 
+  console.log(`[commodities] ${successCount}/${rawSymbols.length} loaded`);
   setCached(cacheKey, result);
-  res.json(result);
+  return res.json(result);
 });
+
 
 /* ── Weekly chart snapshot (served from disk cache) ───── */
 // Server pre-builds weekly OHLCV snapshots using GeckoTerminal
