@@ -1,0 +1,16 @@
+{
+  "name": "pulsecentral",
+  "version": "1.0.0",
+  "description": "PulseChain portfolio tracker",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "lint": "node --check server/index.js js/app.js js/api.js js/trades.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
