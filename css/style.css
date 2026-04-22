@@ -1175,30 +1175,37 @@ input, select, textarea { font-family: var(--font); }
   display: inline-block;
   transition: transform .2s;
 }
-/* Show dropdown on hover of the wrapper */
+/* Show dropdown on hover of the entire wrapper */
 .tab-dropdown {
   display: none;
   position: absolute;
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 200px;
+  min-width: 210px;
   background: var(--bg-1);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  box-shadow: 0 12px 32px rgba(0,0,0,.45);
+  box-shadow: 0 12px 32px rgba(0,0,0,.5);
   z-index: 9999;
   overflow: hidden;
-  /* Small top gap so moving mouse from button to menu doesn't close it */
-  margin-top: 4px;
+  /* Invisible top padding acts as a bridge so hover doesn't drop when
+     moving mouse from the button down to the menu */
+  padding-top: 6px;
+  margin-top: -6px;
 }
-.tab-dropdown-wrap:hover .tab-dropdown,
-.tab-dropdown-wrap:focus-within .tab-dropdown {
+/* Visible menu items inside */
+.tab-dropdown::before {
+  content: '';
+  display: block;
+  height: 6px;
+}
+.tab-dropdown-wrap:hover .tab-dropdown {
   display: block;
   animation: dropdownIn .15s ease;
 }
 @keyframes dropdownIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .tab-dropdown-wrap:hover .dropdown-arrow { transform: rotate(180deg); }

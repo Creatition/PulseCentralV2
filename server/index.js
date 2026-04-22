@@ -179,61 +179,117 @@ app.get('/api/coingecko/global', (req, res) => {
   proxy(res, 'https://api.coingecko.com/api/v3/global');
 });
 
-app.get('/api/coingecko/markets', (req, res) => {
-  const qs = req.query;
-  const params = new URLSearchParams({
-    vs_currency: qs.vs_currency || 'usd',
-    order: qs.order || 'market_cap_desc',
-    per_page: qs.per_page || '100',
-    page: qs.page || '1',
-    sparkline: qs.sparkline || 'false',
-    price_change_percentage: qs.price_change_percentage || '24h,7d',
-  });
-  proxy(res, `https://api.coingecko.com/api/v3/coins/markets?${params}`);
+// Crypto Top 100 — use CoinCap API (free, no auth, reliable)
+app.get('/api/coingecko/markets', async (req, res) => {
+  const cacheKey = 'crypto100';
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const r = await fetch('https://api.coincap.io/v2/assets?limit=100', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(`CoinCap HTTP ${r.status}`);
+    const data = await r.json();
+
+    // Map CoinCap format to CoinGecko-compatible format the frontend expects
+    const mapped = (data.data || []).map((c, i) => ({
+      id:                                    c.id,
+      symbol:                                c.symbol,
+      name:                                  c.name,
+      image:                                 `https://assets.coincap.io/assets/icons/${c.symbol?.toLowerCase()}@2x.png`,
+      current_price:                         Number(c.priceUsd) || 0,
+      market_cap:                            Number(c.marketCapUsd) || 0,
+      market_cap_rank:                       i + 1,
+      total_volume:                          Number(c.volumeUsd24Hr) || 0,
+      price_change_percentage_24h:           Number(c.changePercent24Hr) || 0,
+      price_change_percentage_7d_in_currency: 0,
+    }));
+
+    setCached(cacheKey, mapped);
+    res.json(mapped);
+  } catch (err) {
+    console.error('[crypto100]', err.message);
+    res.status(502).json({ error: err.message });
+  }
 });
 
-// ── Commodities via Yahoo Finance (unofficial JSON endpoint) ─
+// Commodities — use stooq.com CSV (reliable, no auth needed)
 app.get('/api/commodities', async (req, res) => {
   const rawSymbols = (req.query.symbols || '').split(',').filter(Boolean);
   if (!rawSymbols.length) return res.json({});
 
-  const cacheKey = 'commodities:' + rawSymbols.sort().join(',');
+  const cacheKey = 'commodities:' + rawSymbols.slice().sort().join(',');
   const cached = getCached(cacheKey);
   if (cached) return res.json(cached);
 
   const result = {};
 
+  // Map our Yahoo symbols to stooq symbols
+  const STOOQ_MAP = {
+    'CL=F':  'cl.f',   // WTI Crude
+    'BZ=F':  'bz.f',   // Brent
+    'NG=F':  'ng.f',   // Natural Gas
+    'RB=F':  'rb.f',   // Gasoline
+    'GC=F':  'gc.f',   // Gold
+    'SI=F':  'si.f',   // Silver
+    'PL=F':  'pl.f',   // Platinum
+    'PA=F':  'pa.f',   // Palladium
+    'HG=F':  'hg.f',   // Copper
+    'ZW=F':  'zw.f',   // Wheat
+    'ZC=F':  'zc.f',   // Corn
+    'ZS=F':  'zs.f',   // Soybeans
+    'CC=F':  'cc.f',   // Cocoa
+    'KC=F':  'kc.f',   // Coffee
+    'CT=F':  'ct.f',   // Cotton
+    'SB=F':  'sb.f',   // Sugar
+    'LE=F':  'le.f',   // Live Cattle
+    'GF=F':  'gf.f',   // Feeder Cattle
+    'HE=F':  'he.f',   // Lean Hogs
+    'LBS=F': 'lbs.f',  // Lumber
+    'OJ=F':  'oj.f',   // OJ
+    'ZL=F':  'zl.f',   // Soybean Oil
+  };
+
   await Promise.allSettled(rawSymbols.map(async symbol => {
     try {
-      // Yahoo Finance v8 chart endpoint — works without auth
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+      const stooq = STOOQ_MAP[symbol];
+      if (!stooq) return;
+
+      const url = `https://stooq.com/q/d/l/?s=${stooq}&i=d`;
       const r = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)',
-          'Accept': 'application/json',
-          'Origin': 'https://finance.yahoo.com',
-          'Referer': 'https://finance.yahoo.com/',
-        },
-        signal: AbortSignal.timeout(10_000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
+        signal: AbortSignal.timeout(8_000),
       });
       if (!r.ok) return;
-      const data = await r.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta) return;
+      const text = await r.text();
 
-      const price      = meta.regularMarketPrice ?? null;
-      const prevClose  = meta.chartPreviousClose ?? meta.previousClose ?? null;
-      const change     = (price != null && prevClose != null) ? price - prevClose : 0;
-      const changePct  = (price != null && prevClose != null && prevClose !== 0) ? ((price - prevClose) / prevClose) * 100 : 0;
-      const high52w    = meta.fiftyTwoWeekHigh   ?? null;
-      const low52w     = meta.fiftyTwoWeekLow    ?? null;
+      // Parse CSV: Date,Open,High,Low,Close,Volume
+      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      if (lines.length < 2) return;
+
+      const latest   = lines[lines.length - 1].split(',');
+      const prev     = lines[lines.length - 2].split(',');
+      const price    = parseFloat(latest[4]);  // Close
+      const prevClose= parseFloat(prev[4]);    // Previous close
+      if (isNaN(price)) return;
+
+      const change    = price - prevClose;
+      const changePct = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+
+      // Get 52w high/low from all rows
+      const closes = lines.map(l => parseFloat(l.split(',')[4])).filter(n => !isNaN(n));
+      const high52w = Math.max(...closes);
+      const low52w  = Math.min(...closes);
 
       result[symbol] = { price, prevClose, change, changePct, high52w, low52w, lastUpdate: Date.now() };
-    } catch { /* skip failed symbols */ }
+    } catch (e) {
+      console.warn(`[commodities] ${symbol} failed:`, e.message);
+    }
   }));
 
-  // Cache for 60 seconds (commodity prices update infrequently)
-  cache.set(cacheKey, { d: result, t: Date.now() - (TTL - 60_000) });
+  setCached(cacheKey, result);
   res.json(result);
 });
 
