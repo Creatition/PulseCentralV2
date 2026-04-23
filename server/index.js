@@ -242,7 +242,7 @@ const PC_SEARCH_TERMS = [
   'SPARK', 'WATT', 'GENI', 'MINT', 'BRSCO', 'CST',
   'DECI', 'BEAR', 'PINU', 'Atropa',
   // More ecosystem
-  'PHEX', 'eHEX', 'PULSE', 'HEX1', 'PDAI',
+  'PHEX', 'eHEX', 'PULSE', 'HEX1', 'PDAI', 'pDAI',
   'XEN', 'LUCKY', 'AXIS', 'NOPE', 'GOLD',
   'FIRE', 'PENT', 'MAX', 'MOPS', 'HBURN',
   'PITCH', 'ICETH', 'PWORLD',
@@ -910,6 +910,25 @@ app.get('/api/pump-tires/tokens', async (req, res) => {
 let pulseTokenLibrary = new Map(); // addr → token
 let libraryLastUpdate = 0;
 const LIBRARY_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+// Pinned tokens — always present in the library regardless of Moralis results
+const PINNED_TOKENS = [
+  {
+    address:           '0xfc64556faa683e6087f425819c7ca3c558e13ac1',
+    symbol:            'pDAI',
+    name:              'PulseChain DAI',
+    logo:              null,
+    priceUsd:          0,
+    priceChange24h:    0,
+    volumeUsd24h:      0,
+    marketCapUsd:      0,
+    totalLiquidityUsd: 0,
+    securityScore:     null,
+    isVerified:        false,
+    _pinned:           true,
+  },
+];
+for (const t of PINNED_TOKENS) pulseTokenLibrary.set(t.address, t);
 
 async function updatePulseTokenLibrary() {
   console.log('[token-library] Updating...');

@@ -61,6 +61,7 @@ const API = (() => {
     { symbol: 'PHIAT', address: '0x96e035ae0905efac8f733f133462f971cfa45db1' },
     { symbol: 'TEAM',  address: '0xc6a2cDf807F251e4b82C236D9A23C5156D3fB3A2' },
     { symbol: 'WATT',  address: '0xDfdc2836FD2E63Bba9f0eE07901aD465Bff4DE71' },
+    { symbol: 'pDAI',  address: '0xfC64556FAA683e6087F425819C7Ca3C558e13aC1' },
   ];
 
   /* ── Denylist ─────────────────────────────────────── */
