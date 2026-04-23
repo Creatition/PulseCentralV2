@@ -6,43 +6,73 @@
 /* ── Google Font ──────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
-/* ── Design tokens ────────────────────────────────────── */
+/* ── Design tokens — PulseChain theme (default) ───────── */
 :root {
-  --bg:           #09090f;
-  --bg-1:         #0f0f1a;
-  --bg-2:         #161624;
-  --bg-3:         #1e1e30;
-  --border:       #252538;
-  --border-light: #2e2e48;
+  /* Backgrounds — deep space navy */
+  --bg:           #04050f;
+  --bg-0:         #04050f;
+  --bg-1:         #080920;
+  --bg-2:         #0e1030;
+  --bg-3:         #141640;
 
-  --primary:      #7b2fff;
-  --primary-dim:  rgba(123,47,255,.15);
-  --primary-glow: rgba(123,47,255,.4);
-  --accent:       #ff2f7b;
+  /* Borders */
+  --border:       #1a1f4a;
+  --border-light: #252c62;
 
-  --text:         #e8e8f4;
-  --text-2:       #9898bb;
-  --text-3:       #55556a;
+  /* Primary — electric blue */
+  --primary:      #0af;
+  --primary-dim:  rgba(0,170,255,.12);
+  --primary-glow: rgba(0,170,255,.35);
 
+  /* Accent — hot pink/magenta */
+  --accent:       #ff2d6b;
+  --accent-dim:   rgba(255,45,107,.12);
+
+  /* Secondary — red-orange */
+  --secondary:    #ff5533;
+
+  /* Text */
+  --text:         #eef2ff;
+  --text-2:       #8890cc;
+  --text-3:       #484e80;
+
+  /* Status */
   --green:  #22c55e;
   --red:    #ef4444;
   --yellow: #f59e0b;
 
-  --radius:   10px;
-  --radius-lg:16px;
-  --radius-sm: 6px;
+  /* Radius / font */
+  --radius:    10px;
+  --radius-lg: 16px;
+  --radius-sm:  6px;
   --font: 'DM Sans', sans-serif;
   --mono: 'DM Mono', monospace;
+
+  /* Theme-specific gradient for backgrounds */
+  --bg-gradient: radial-gradient(ellipse at 20% 0%, rgba(0,170,255,.08) 0%, transparent 60%),
+                 radial-gradient(ellipse at 80% 100%, rgba(255,45,107,.06) 0%, transparent 60%);
+  --topbar-border: rgba(0,170,255,.2);
+  --logo-pulse: var(--primary);
+  --logo-central: var(--text);
+}
   --shadow: 0 4px 24px rgba(0,0,0,.4);
 }
 
 /* ── Reset ────────────────────────────────────────────── */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+/* Smooth theme transitions */
+body, .topbar, .tab-btn, .tab-dropdown, .coin-card, .market-row,
+.market-header, .page-loader, .btn, .input, .badge,
+[class*="eco-card"], [class*="liberty"], [class*="wl-"] {
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
 html { font-size:15px; scroll-behavior:smooth; }
 body {
   font-family: var(--font);
   background: var(--bg);
-  color: var(--text);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -206,30 +236,48 @@ input, select, textarea { font-family: var(--font); }
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(9,9,15,.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(4,5,15,.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--topbar-border, var(--border));
   height: 56px;
   display: flex;
   align-items: center;
   padding: 0 1.25rem;
   gap: 1rem;
   overflow: visible;
+  transition: border-color .4s;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: .5rem;
-  font-size: 1.1rem;
-  font-weight: 700;
+  gap: .55rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
   cursor: pointer;
   flex-shrink: 0;
   text-decoration: none;
+  user-select: none;
 }
-.logo-icon { width: 28px; height: 28px; }
-.logo span.pulse { color: var(--primary); }
-.logo span.central { color: var(--text); }
+.logo:hover .logo-icon { filter: drop-shadow(0 0 6px var(--primary-glow)); }
+.logo-icon {
+  width: 36px;
+  height: 32px;
+  transition: filter .3s;
+}
+.logo-icon polyline { transition: stroke .4s; }
+.logo-icon path, .logo-icon rect, .logo-icon line { transition: fill .4s, stroke .4s; }
+.logo span.pulse   { color: var(--logo-pulse, var(--primary)); transition: color .4s; }
+.logo span.central { color: var(--logo-central, var(--text)); transition: color .4s; letter-spacing: -.01em; }
+
+/* Heartbeat animation on logo hover */
+@keyframes pulse-beat {
+  0%, 100% { opacity: .95; }
+  50%       { opacity: .5; }
+}
+.logo:hover .logo-icon polyline { animation: pulse-beat .8s ease-in-out infinite; }
 
 /* Tab nav */
 .tab-nav {
@@ -1092,31 +1140,133 @@ input, select, textarea { font-family: var(--font); }
 .alerts-empty { padding: 1rem; text-align: center; color: var(--text-3); font-size: .78rem; }
 
 /* ── Theme swatches ───────────────────────────────────── */
-.theme-swatches { display: flex; gap: .3rem; }
+.theme-swatches { display: flex; gap: .4rem; align-items: center; }
 .theme-swatch {
-  width: 20px; height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid transparent;
-  transition: all .15s;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: all .2s;
   cursor: pointer;
+  flex-shrink: 0;
 }
-.theme-swatch.active { border-color: #fff; transform: scale(1.2); }
+.theme-swatch:hover { transform: scale(1.15); outline-color: rgba(255,255,255,.3); }
+.theme-swatch.active {
+  outline-color: var(--primary);
+  transform: scale(1.2);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
 
-/* ── Themes ───────────────────────────────────────────── */
+/* ── Themes — full color-scheme per token ─────────────── */
+
+/* PulseChain: Electric Blue + Hot Pink + Deep Space Navy */
+[data-theme="pulsechain"] {
+  --bg:           #04050f;
+  --bg-0:         #04050f;
+  --bg-1:         #080920;
+  --bg-2:         #0e1030;
+  --bg-3:         #141640;
+  --border:       #1a1f4a;
+  --border-light: #252c62;
+  --primary:      #00aaff;
+  --primary-dim:  rgba(0,170,255,.12);
+  --primary-glow: rgba(0,170,255,.35);
+  --accent:       #ff2d6b;
+  --accent-dim:   rgba(255,45,107,.12);
+  --secondary:    #ff5533;
+  --text:         #eef2ff;
+  --text-2:       #8890cc;
+  --text-3:       #484e80;
+  --bg-gradient:  radial-gradient(ellipse at 15% 0%, rgba(0,170,255,.10) 0%, transparent 55%),
+                  radial-gradient(ellipse at 85% 100%, rgba(255,45,107,.08) 0%, transparent 55%);
+  --topbar-border: rgba(0,170,255,.25);
+  --logo-pulse:   #00aaff;
+  --logo-central: #ff2d6b;
+}
+
+/* HEX: Golden Yellow + Blood Red + Hot Pink + Void Black */
 [data-theme="hex"] {
-  --primary: #e8002d;
-  --primary-dim: rgba(232,0,45,.12);
-  --primary-glow: rgba(232,0,45,.4);
+  --bg:           #0a0005;
+  --bg-0:         #0a0005;
+  --bg-1:         #130008;
+  --bg-2:         #1a000d;
+  --bg-3:         #230010;
+  --border:       #350020;
+  --border-light: #4a0030;
+  --primary:      #ffd700;
+  --primary-dim:  rgba(255,215,0,.12);
+  --primary-glow: rgba(255,215,0,.40);
+  --accent:       #ff1744;
+  --accent-dim:   rgba(255,23,68,.12);
+  --secondary:    #ff69b4;
+  --text:         #fff5e6;
+  --text-2:       #cc8899;
+  --text-3:       #663344;
+  --green:  #22c55e;
+  --red:    #ff1744;
+  --yellow: #ffd700;
+  --bg-gradient:  radial-gradient(ellipse at 0% 0%, rgba(255,23,68,.12) 0%, transparent 50%),
+                  radial-gradient(ellipse at 100% 100%, rgba(255,215,0,.10) 0%, transparent 50%),
+                  radial-gradient(ellipse at 50% 50%, rgba(255,105,180,.05) 0%, transparent 70%);
+  --topbar-border: rgba(255,215,0,.3);
+  --logo-pulse:   #ffd700;
+  --logo-central: #ff69b4;
 }
+
+/* PLSX: Red + Green (candle chart colors) + Very Dark background */
 [data-theme="pulsex"] {
-  --primary: #ff6d00;
-  --primary-dim: rgba(255,109,0,.12);
-  --primary-glow: rgba(255,109,0,.4);
+  --bg:           #030a05;
+  --bg-0:         #030a05;
+  --bg-1:         #060f08;
+  --bg-2:         #0a160c;
+  --bg-3:         #0f1f12;
+  --border:       #0d2412;
+  --border-light: #143018;
+  --primary:      #e8002d;
+  --primary-dim:  rgba(232,0,45,.13);
+  --primary-glow: rgba(232,0,45,.40);
+  --accent:       #22c55e;
+  --accent-dim:   rgba(34,197,94,.13);
+  --secondary:    #16a34a;
+  --text:         #e8f5e9;
+  --text-2:       #6aab7a;
+  --text-3:       #2d5535;
+  --green:  #22c55e;
+  --red:    #e8002d;
+  --bg-gradient:  radial-gradient(ellipse at 20% 0%, rgba(232,0,45,.10) 0%, transparent 55%),
+                  radial-gradient(ellipse at 80% 100%, rgba(34,197,94,.09) 0%, transparent 55%);
+  --topbar-border: rgba(232,0,45,.3);
+  --logo-pulse:   #e8002d;
+  --logo-central: #22c55e;
 }
+
+/* INC: Neon Green + Pure Black (terminal aesthetic) */
 [data-theme="inc"] {
-  --primary: #00e676;
-  --primary-dim: rgba(0,230,118,.1);
-  --primary-glow: rgba(0,230,118,.4);
+  --bg:           #000500;
+  --bg-0:         #000500;
+  --bg-1:         #000d02;
+  --bg-2:         #001504;
+  --bg-3:         #001e06;
+  --border:       #003308;
+  --border-light: #004d0c;
+  --primary:      #00e676;
+  --primary-dim:  rgba(0,230,118,.11);
+  --primary-glow: rgba(0,230,118,.40);
+  --accent:       #69ff47;
+  --accent-dim:   rgba(105,255,71,.11);
+  --secondary:    #00bfa5;
+  --text:         #e8fff0;
+  --text-2:       #52bb6e;
+  --text-3:       #1f5530;
+  --green:  #00e676;
+  --red:    #ef4444;
+  --bg-gradient:  radial-gradient(ellipse at 50% 0%, rgba(0,230,118,.13) 0%, transparent 60%),
+                  radial-gradient(ellipse at 50% 100%, rgba(0,230,118,.06) 0%, transparent 50%);
+  --topbar-border: rgba(0,230,118,.3);
+  --logo-pulse:   #00e676;
+  --logo-central: #69ff47;
 }
 
 /* ── Responsive ───────────────────────────────────────── */
