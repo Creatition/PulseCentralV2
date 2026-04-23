@@ -203,20 +203,9 @@ function filterBars(bars, days) {
 
 const THEMES = ['pulsechain', 'hex', 'pulsex', 'inc'];
 
-// Topbar backgrounds per theme for proper blur overlay
-const THEME_TOPBAR_BG = {
-  pulsechain: 'rgba(4,5,15,.88)',
-  hex:        'rgba(10,0,5,.90)',
-  pulsex:     'rgba(3,10,5,.90)',
-  inc:        'rgba(0,5,0,.92)',
-};
-
 function applyTheme(name) {
   if (!THEMES.includes(name)) name = 'pulsechain';
   document.documentElement.dataset.theme = name;
-  // Update topbar background to match theme
-  const topbar = document.querySelector('.topbar');
-  if (topbar) topbar.style.background = THEME_TOPBAR_BG[name] || THEME_TOPBAR_BG.pulsechain;
   try { localStorage.setItem('pc-theme', name); } catch {}
   document.querySelectorAll('.theme-swatch').forEach(b => b.classList.toggle('active', b.dataset.theme === name));
 }

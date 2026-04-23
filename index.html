@@ -16,24 +16,9 @@
 <header class="topbar" role="banner">
 
   <a class="logo logo-link" href="#" aria-label="PulseCentral home">
-    <svg class="logo-icon" viewBox="0 0 40 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <!-- Central Park tree silhouettes (left side) -->
-      <path d="M2 28 Q2 24 5 24 Q5 20 7.5 20 Q7.5 16 10 18 L10 28Z" fill="var(--logo-pulse,.#00aaff)" opacity=".7"/>
-      <!-- NYC skyline buildings (right side) -->
-      <rect x="30" y="22" width="3" height="6" rx=".5" fill="var(--logo-pulse,#00aaff)" opacity=".6"/>
-      <rect x="34" y="19" width="2.5" height="9" rx=".5" fill="var(--logo-pulse,#00aaff)" opacity=".7"/>
-      <rect x="37" y="21" width="3" height="7" rx=".5" fill="var(--logo-pulse,#00aaff)" opacity=".5"/>
-      <!-- Heartbeat / pulse waveform across the middle -->
-      <polyline
-        points="0,24 5,24 7,26 9,18 11,28 13,24 17,24 19,20 21,28 23,24 27,24 29,26 31,22 33,24 40,24"
-        stroke="var(--logo-central,#ff2d6b)"
-        stroke-width="2.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        fill="none"
-        opacity=".95"/>
-      <!-- Park ground line -->
-      <line x1="0" y1="28" x2="40" y2="28" stroke="var(--logo-pulse,#00aaff)" stroke-width=".8" opacity=".3"/>
+    <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="16" cy="16" r="16" fill="#7b2fff" opacity=".15"/>
+      <path d="M8 16 L13 9 L16 14 L19 11 L24 16 L19 23 L16 18 L13 21 Z" fill="#7b2fff" stroke="#7b2fff" stroke-width=".5" stroke-linejoin="round"/>
     </svg>
     <span class="pulse">Pulse</span><span class="central">Central</span>
   </a>
@@ -97,18 +82,10 @@
   <div class="topbar-actions">
     <!-- Theme swatches -->
     <div class="theme-swatches" aria-label="Theme picker">
-      <button class="theme-swatch" data-theme="pulsechain"
-              style="background:linear-gradient(135deg,#00aaff 50%,#ff2d6b 50%)"
-              title="PulseChain — Blue &amp; Pink" aria-label="PulseChain theme"></button>
-      <button class="theme-swatch" data-theme="hex"
-              style="background:linear-gradient(135deg,#ffd700 40%,#e8002d 70%,#ff69b4 100%)"
-              title="HEX — Gold, Red &amp; Pink" aria-label="HEX theme"></button>
-      <button class="theme-swatch" data-theme="pulsex"
-              style="background:linear-gradient(135deg,#e8002d 50%,#22c55e 50%)"
-              title="PLSX — Red &amp; Green" aria-label="PulseX theme"></button>
-      <button class="theme-swatch" data-theme="inc"
-              style="background:linear-gradient(135deg,#001e06 50%,#00e676 50%)"
-              title="INC — Green &amp; Black" aria-label="INC theme"></button>
+      <button class="theme-swatch" data-theme="pulsechain" style="background:#7b2fff" title="PulseChain theme" aria-label="PulseChain theme"></button>
+      <button class="theme-swatch" data-theme="hex"        style="background:#e8002d" title="HEX theme"        aria-label="HEX theme"></button>
+      <button class="theme-swatch" data-theme="pulsex"     style="background:#ff6d00" title="PulseX theme"     aria-label="PulseX theme"></button>
+      <button class="theme-swatch" data-theme="inc"        style="background:#00e676" title="INC theme"        aria-label="INC theme"></button>
     </div>
 
     <!-- Price alert bell -->
