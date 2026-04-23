@@ -926,40 +926,59 @@ async function loadMarkets() {
   const loading = $('markets-loading');
   const error   = $('markets-error');
   show(loading); hide(error);
+
   try {
-    // Fetch DexScreener pairs + Moralis PulseChain top tokens in parallel
-    const [dexPairs, moralisTokens] = await Promise.allSettled([
+    // Fetch Moralis PulseChain tokens (comprehensive) + DexScreener in parallel
+    const [moralisResult, dexResult] = await Promise.allSettled([
+      fetch('/api/moralis/pulsechain/tokens').then(r => r.json()),
       API.getTopPairs(),
-      fetch('/api/moralis/pulsechain/tokens').then(r => r.json()).catch(() => null),
     ]);
 
-    marketPairs = dexPairs.status === 'fulfilled' ? dexPairs.value : [];
+    // Build address→pair map from DexScreener for liquidity/pair data
+    const dexPairs = dexResult.status === 'fulfilled' ? dexResult.value : [];
+    const dexByAddr = new Map(dexPairs.map(p => [(p.baseToken?.address || '').toLowerCase(), p]));
 
-    // Merge Moralis tokens not already in the list (by address)
-    if (moralisTokens.status === 'fulfilled' && moralisTokens.value) {
-      const mv = moralisTokens.value;
-      const tokenArr = Array.isArray(mv) ? mv : (mv.result || mv.tokens || []);
-      const existingAddrs = new Set(marketPairs.map(p => (p.baseToken?.address || '').toLowerCase()));
+    // Start with DexScreener pairs (they have the best price/liquidity data)
+    const seen = new Map();
+    for (const pair of dexPairs) {
+      const addr = (pair.baseToken?.address || '').toLowerCase();
+      if (!addr) continue;
+      seen.set(addr, pair);
+    }
 
-      for (const tok of tokenArr) {
-        const addr = (tok.token_address || tok.address || '').toLowerCase();
-        if (!addr || existingAddrs.has(addr)) continue;
-        // Build a market-pair-compatible object
-        marketPairs.push({
-          baseToken:   { address: addr, symbol: tok.symbol || '?', name: tok.name || tok.symbol || '?' },
-          quoteToken:  { symbol: 'USD' },
-          priceUsd:    tok.usd_price ? String(tok.usd_price) : '0',
-          priceChange: { h24: tok.price_24h_percent_change || 0 },
-          volume:      { h24: tok.volume_24h_usd || 0 },
-          marketCap:   tok.market_cap_usd || tok.fully_diluted_valuation || 0,
-          fdv:         tok.fully_diluted_valuation || 0,
-          liquidity:   { usd: 0 },
-          pairAddress: null,
-          logoUrl:     tok.logo || tok.thumbnail || null,
-          _moralis:    true,
-        });
+    // Merge Moralis tokens — enrich with logo, and add tokens not in DexScreener
+    if (moralisResult.status === 'fulfilled' && Array.isArray(moralisResult.value)) {
+      for (const tok of moralisResult.value) {
+        const addr = tok.address;
+        if (!addr) continue;
+
+        if (seen.has(addr)) {
+          // Enrich existing DexScreener pair with Moralis logo
+          const existing = seen.get(addr);
+          if (!existing.logoUrl && tok.logo) existing.logoUrl = tok.logo;
+        } else {
+          // New token from Moralis not in DexScreener — convert to market-pair shape
+          seen.set(addr, {
+            baseToken:   { address: addr, symbol: tok.symbol, name: tok.name },
+            quoteToken:  { symbol: 'USD' },
+            priceUsd:    tok.priceUsd ? String(tok.priceUsd) : '0',
+            priceChange: { h24: tok.priceChange24h || 0 },
+            volume:      { h24: tok.volumeUsd24h || 0 },
+            marketCap:   tok.marketCapUsd || 0,
+            fdv:         tok.marketCapUsd || 0,
+            liquidity:   { usd: tok.totalLiquidityUsd || 0 },
+            pairAddress: null,
+            logoUrl:     tok.logo || null,
+            _moralis:    true,
+          });
+        }
       }
     }
+
+    // Filter: only tokens with a price > 0 or listed on DexScreener
+    marketPairs = [...seen.values()].filter(p =>
+      !p._moralis || parseFloat(p.priceUsd || 0) > 0 || (p.liquidity?.usd || 0) > 100
+    );
 
     hide(loading);
     renderMarketList();
@@ -2281,21 +2300,13 @@ async function addWatchlistToken() {
    ══════════════════════════════════════════════════════ */
 
 let swapInited = false;
-let libertyInited = false;
 
 function initSwap() {
-  if (activeSwapSubtab === 'libertyswap') {
-    if (!libertyInited) {
-      libertyInited = true;
-      const iframe = $('liberty-iframe');
-      if (iframe) iframe.src = 'https://libertyswap.finance/';
-    }
-  } else {
-    if (!swapInited) {
-      swapInited = true;
-      const iframe = $('swap-iframe');
-      if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
-    }
+  // LibertySwap is just a link card — no iframe to load
+  if (activeSwapSubtab !== 'libertyswap' && !swapInited) {
+    swapInited = true;
+    const iframe = $('swap-iframe');
+    if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
   }
 }
 

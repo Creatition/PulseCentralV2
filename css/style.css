@@ -1715,3 +1715,65 @@ a.commodity-card:hover {
 .liberty-router-row:last-child { border-bottom: none; }
 .liberty-router-chain { color: var(--text-2); font-size: .72rem; }
 .liberty-router-addr { color: var(--text-3); font-size: .65rem; font-family: var(--mono); }
+
+/* ── LibertySwap launch card ─────────────────────────── */
+.liberty-launch-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem 0;
+}
+.liberty-launch-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+.liberty-launch-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+.liberty-launch-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.liberty-launch-desc {
+  font-size: .84rem;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.liberty-launch-stats {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  padding: .75rem 1.25rem;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+.liberty-launch-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .15rem;
+  font-size: .75rem;
+}
+.liberty-launch-stat span { color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.liberty-launch-stat strong { color: var(--text); font-size: .9rem; font-family: var(--mono); }
+.liberty-launch-btn {
+  width: 100%;
+  justify-content: center;
+  font-size: 1rem;
+  padding: .75rem 1.5rem;
+  text-decoration: none;
+}

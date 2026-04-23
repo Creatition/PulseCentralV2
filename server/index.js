@@ -215,20 +215,166 @@ app.get('/api/moralis/pls-price', async (req, res) => {
 });
 
 // Top PulseChain tokens by market cap (for markets page enrichment)
+// ── Moralis: comprehensive PulseChain token search ────
+// Searches for all significant PulseChain tokens using multiple strategies:
+// 1. Token search with common terms filtered to PulseChain (chain=0x171)
+// 2. Top movers/market data on PulseChain
+// Results are merged, deduplicated by address, sorted by liquidity/volume
+// Cached for 5 minutes to avoid hammering the API
+
+let pcTokensCache = null;
+let pcTokensFetchPromise = null;
+const PC_TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Common search terms to discover PulseChain tokens
+const PC_SEARCH_TERMS = [
+  'PLS', 'PLSX', 'HEX', 'INC', 'PHEX', 'PULSE', 'PULSEX',
+  'MAXI', 'TRIO', 'BASE', 'LOAN', 'HDRN', 'ICSA',
+  'DAI', 'USDC', 'USDT', 'WETH', 'WBTC',
+  '9MM', 'SPARK', 'WATT', 'MINT', 'GENI',
+  'PLSD', 'PLSB', 'PLSR', 'PINU',
+  'Atropa', 'BRSCO', 'CST', 'DECI', 'BEAR',
+];
+
+async function fetchAllPulseChainTokens() {
+  const seen = new Map(); // address → token object
+  let totalFetched = 0;
+
+  // Strategy 1: Token search by term, filtered to PulseChain
+  const searchResults = await Promise.allSettled(
+    PC_SEARCH_TERMS.map(async term => {
+      try {
+        const url = new URL(`${MORALIS_BASE}/tokens/search`);
+        url.searchParams.set('query', term);
+        url.searchParams.append('chains[]', PULSECHAIN_ID);
+        url.searchParams.set('limit', '10');
+        url.searchParams.set('sortBy', 'liquidity');
+        const r = await fetch(url.toString(), {
+          headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        return data?.result || [];
+      } catch (e) {
+        console.warn(`[moralis/search] "${term}":`, e.message);
+        return [];
+      }
+    })
+  );
+
+  for (const result of searchResults) {
+    if (result.status !== 'fulfilled') continue;
+    for (const tok of result.value) {
+      // Only keep PulseChain tokens (chainId=0x171 or 369)
+      const chainId = (tok.chainId || tok.chain_id || '').toLowerCase();
+      if (chainId && chainId !== '0x171' && chainId !== '369') continue;
+      const addr = (tok.tokenAddress || tok.token_address || tok.address || '').toLowerCase();
+      if (!addr || seen.has(addr)) continue;
+      seen.set(addr, normalizeMoralisToken(tok));
+      totalFetched++;
+    }
+  }
+
+  // Strategy 2: Top market cap tokens on PulseChain
+  try {
+    const url = new URL(`${MORALIS_BASE}/market-data/erc20s/top-tokens`);
+    url.searchParams.set('chain', PULSECHAIN_ID);
+    url.searchParams.set('limit', '100');
+    const r = await fetch(url.toString(), {
+      headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const tokens = data?.result || data?.tokens || (Array.isArray(data) ? data : []);
+      for (const tok of tokens) {
+        const addr = (tok.tokenAddress || tok.token_address || tok.address || '').toLowerCase();
+        if (!addr || seen.has(addr)) continue;
+        seen.set(addr, normalizeMoralisToken(tok));
+        totalFetched++;
+      }
+    }
+  } catch (e) { console.warn('[moralis/top-tokens]', e.message); }
+
+  // Strategy 3: Top movers on PulseChain
+  try {
+    const url = new URL(`${MORALIS_BASE}/market-data/erc20s/top-movers`);
+    url.searchParams.set('chain', PULSECHAIN_ID);
+    const r = await fetch(url.toString(), {
+      headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const tokens = data?.gainers || data?.result || (Array.isArray(data) ? data : []);
+      for (const tok of tokens) {
+        const addr = (tok.tokenAddress || tok.token_address || tok.address || '').toLowerCase();
+        if (!addr || seen.has(addr)) continue;
+        seen.set(addr, normalizeMoralisToken(tok));
+        totalFetched++;
+      }
+    }
+  } catch (e) { console.warn('[moralis/top-movers]', e.message); }
+
+  // Sort: PLS first, then by total liquidity descending, filter out zero-value tokens
+  const PRIORITY = ['0xa1077a294dde1b09bb078844df40758a5d0f9a27', // WPLS
+                    '0x95b303987a60c71504d99aa1b13b4da07b0790ab', // PLSX
+                    '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39', // HEX
+                    '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d']; // INC
+
+  const sorted = [...seen.values()]
+    .filter(t => t.priceUsd > 0 || t.totalLiquidityUsd > 0)
+    .sort((a, b) => {
+      const ap = PRIORITY.indexOf(a.address);
+      const bp = PRIORITY.indexOf(b.address);
+      if (ap !== -1 || bp !== -1) return (ap === -1 ? 999 : ap) - (bp === -1 ? 999 : bp);
+      return (b.totalLiquidityUsd || 0) - (a.totalLiquidityUsd || 0);
+    });
+
+  console.log(`[moralis/pulsechain] ${sorted.length} tokens (${totalFetched} raw fetched)`);
+  return sorted;
+}
+
+function normalizeMoralisToken(tok) {
+  const addr = (tok.tokenAddress || tok.token_address || tok.address || '').toLowerCase();
+  return {
+    address:           addr,
+    symbol:            tok.symbol || '?',
+    name:              tok.name || tok.symbol || '?',
+    logo:              tok.logo || tok.thumbnail || null,
+    priceUsd:          parseFloat(tok.usdPrice || tok.usd_price || tok.price || 0) || 0,
+    priceChange24h:    parseFloat(tok.usdPricePercentChange?.oneDay || tok.price_24h_percent_change || 0) || 0,
+    volumeUsd24h:      parseFloat(tok.volumeUsd?.oneDay || tok.volume_24h_usd || 0) || 0,
+    marketCapUsd:      parseFloat(tok.marketCap || tok.market_cap_usd || tok.fullyDilutedValuation || 0) || 0,
+    totalLiquidityUsd: parseFloat(tok.totalLiquidityUsd || tok.liquidity_usd || 0) || 0,
+    securityScore:     tok.securityScore || null,
+    isVerified:        tok.isVerifiedContract || false,
+  };
+}
+
 app.get('/api/moralis/pulsechain/tokens', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  const cacheKey = 'moralis-pc-tokens';
-  const cached = getCached(cacheKey);
-  if (cached) return res.json(cached);
+
+  // Return cache if fresh
+  if (pcTokensCache && (Date.now() - pcTokensCache.ts < PC_TOKEN_CACHE_TTL)) {
+    return res.json(pcTokensCache.data);
+  }
+  // Deduplicate concurrent fetches
+  if (pcTokensFetchPromise) {
+    try { return res.json(await pcTokensFetchPromise); } catch { return res.status(502).json({ error: 'Fetch failed' }); }
+  }
+
+  pcTokensFetchPromise = fetchAllPulseChainTokens();
   try {
-    const data = await moralisFetch('/market-data/erc20s/top-movers', {
-      chain: PULSECHAIN_ID,
-    });
-    setCached(cacheKey, data);
-    res.json(data);
+    const data = await pcTokensFetchPromise;
+    pcTokensCache = { data, ts: Date.now() };
+    pcTokensFetchPromise = null;
+    return res.json(data);
   } catch (e) {
-    console.error('[moralis/pc-tokens]', e.message);
-    res.status(502).json({ error: e.message });
+    pcTokensFetchPromise = null;
+    console.error('[moralis/pulsechain/tokens]', e.message);
+    return res.status(502).json({ error: e.message });
   }
 });
 
