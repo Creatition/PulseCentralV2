@@ -159,6 +159,79 @@ app.get('/api/libertyswap/*', async (req, res) => {
   }
 });
 
+// ── Moralis API (PulseChain = chain 0x171 = 369) ──────
+const MORALIS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjliZmFmN2YwLWM1N2MtNDk2MC04OWViLWM5NTBhZmZhODRmZSIsIm9yZ0lkIjoiNTExODQzIiwidXNlcklkIjoiNTI2Njc0IiwidHlwZUlkIjoiODgyNWFkNTQtOWE5Ny00YmU5LTk3MzUtN2EyZDA0ZDA0YzJkIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzY5MDY5MTcsImV4cCI6NDkzMjY2NjkxN30.X9n_kWwUpsuHR0D-SbGifEz57UpibbeJjt9FDF96uZs';
+const MORALIS_BASE = 'https://deep-index.moralis.io/api/v2.2';
+const PULSECHAIN_ID = '0x171'; // hex chainId for PulseChain (369)
+
+async function moralisFetch(path, params = {}) {
+  const url = new URL(`${MORALIS_BASE}${path}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const r = await fetch(url.toString(), {
+    headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!r.ok) throw new Error(`Moralis HTTP ${r.status}`);
+  return r.json();
+}
+
+// Wallet token balances with prices (PulseChain)
+app.get('/api/moralis/wallet/:address/tokens', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const addr = sanitise(req.params.address);
+  if (!addr || !/^0x[0-9a-f]{40}$/i.test(addr)) return res.status(400).json({ error: 'Invalid address' });
+  try {
+    const data = await moralisFetch(`/wallets/${addr}/tokens`, {
+      chain: PULSECHAIN_ID,
+      exclude_spam: 'true',
+      exclude_unverified_contracts: 'false',
+    });
+    res.json(data);
+  } catch (e) {
+    console.error('[moralis/tokens]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// PLS price via Moralis token price endpoint
+app.get('/api/moralis/pls-price', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const cacheKey = 'moralis-pls-price';
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
+  try {
+    // WPLS contract address on PulseChain
+    const WPLS = '0xA1077a294dDE1B09bB078844df40758a5D0f9a27';
+    const data = await moralisFetch(`/erc20/${WPLS}/price`, {
+      chain: PULSECHAIN_ID,
+      include: 'percent_change',
+    });
+    setCached(cacheKey, data);
+    res.json(data);
+  } catch (e) {
+    console.error('[moralis/pls-price]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Top PulseChain tokens by market cap (for markets page enrichment)
+app.get('/api/moralis/pulsechain/tokens', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const cacheKey = 'moralis-pc-tokens';
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
+  try {
+    const data = await moralisFetch('/market-data/erc20s/top-movers', {
+      chain: PULSECHAIN_ID,
+    });
+    setCached(cacheKey, data);
+    res.json(data);
+  } catch (e) {
+    console.error('[moralis/pc-tokens]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // ── GoPlus security (confirmed working) ───────────────
 app.get('/api/goplus/*', (req, res) => {
   const p = sanitise(req.params[0]);
@@ -275,74 +348,159 @@ app.get('/api/coingecko/markets', async (req, res) => {
   return res.status(502).json({ error: 'Market data unavailable. Try again shortly.' });
 });
 
-// Commodities — fetches commodity-tracking tokens from CoinGecko
-// These are verified CoinGecko IDs for tokens that track real-world commodity prices
+/* ── Alpha Vantage Commodities — hourly exact-hour cache ─── */
+// Functions: WTI, BRENT, NATURAL_GAS, COPPER, ALUMINUM, WHEAT, CORN, COTTON, SUGAR, COFFEE
+// Fetches once per hour at the exact hour mark, shared across all users
+
+const AV_KEY = 'YFAIAETGBN2H298Z';
+
+// Map our Yahoo-style frontend IDs to Alpha Vantage function names
+const AV_COMMODITY_MAP = [
+  { id: 'GC=F',  fn: null,          name: 'Gold',          unit: '/oz'    }, // No AV endpoint for Gold/Silver/Platinum — use CoinGecko tokens
+  { id: 'SI=F',  fn: null,          name: 'Silver',        unit: '/oz'    },
+  { id: 'PL=F',  fn: null,          name: 'Platinum',      unit: '/oz'    },
+  { id: 'CL=F',  fn: 'WTI',         name: 'WTI Crude',     unit: '/bbl'   },
+  { id: 'BZ=F',  fn: 'BRENT',       name: 'Brent Crude',   unit: '/bbl'   },
+  { id: 'NG=F',  fn: 'NATURAL_GAS', name: 'Natural Gas',   unit: '/MMBtu' },
+  { id: 'HG=F',  fn: 'COPPER',      name: 'Copper',        unit: '/lb'    },
+  { id: 'ZW=F',  fn: 'WHEAT',       name: 'Wheat',         unit: '/bu'    },
+  { id: 'ZC=F',  fn: 'CORN',        name: 'Corn',          unit: '/bu'    },
+  { id: 'CT=F',  fn: 'COTTON',      name: 'Cotton',        unit: '/lb'    },
+  { id: 'SB=F',  fn: 'SUGAR',       name: 'Sugar',         unit: '/lb'    },
+  { id: 'KC=F',  fn: 'COFFEE',      name: 'Coffee',        unit: '/lb'    },
+];
+
+// CoinGecko IDs for metals (no AV equivalent with free key)
+const METALS_CG_IDS = 'pax-gold,tether-gold,silvercoin,platinum';
+const METALS_CG_MAP = {
+  'pax-gold':    'GC=F',
+  'tether-gold': 'GC=F',
+  'silvercoin':  'SI=F',
+  'silver':      'SI=F',
+  'platinum':    'PL=F',
+};
+
+let commodityHourlyCache = null;   // { data: {...}, hourKey: 'YYYY-MM-DDTHH' }
+let commodityFetchPromise = null;  // deduplicate concurrent requests
+
+function getHourKey() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}T${String(d.getUTCHours()).padStart(2,'0')}`;
+}
+
+async function fetchAlphaVantageAll() {
+  const result = {};
+  const avItems = AV_COMMODITY_MAP.filter(c => c.fn);
+
+  // Rate limit: free AV key = 25 calls/day, 500/month. Fetch 9 commodities.
+  // Sequential with small delay to be safe
+  for (const item of avItems) {
+    try {
+      const url = `https://www.alphavantage.co/query?function=${item.fn}&interval=daily&apikey=${AV_KEY}`;
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) { console.warn(`[AV] ${item.fn} HTTP ${r.status}`); continue; }
+      const data = await r.json();
+
+      // AV returns: { "name": "...", "data": [ { "date": "YYYY-MM-DD", "value": "XX.XX" }, ... ] }
+      const series = data?.data;
+      if (!Array.isArray(series) || series.length < 2) {
+        console.warn(`[AV] ${item.fn} no data:`, JSON.stringify(data).slice(0, 100)); continue;
+      }
+
+      // Latest non-null value
+      const latest = series.find(d => d.value && d.value !== '.' && d.value !== 'null');
+      const prev   = series.slice(1).find(d => d.value && d.value !== '.' && d.value !== 'null');
+      if (!latest) { console.warn(`[AV] ${item.fn} no valid latest`); continue; }
+
+      const price    = parseFloat(latest.value);
+      const prevVal  = prev ? parseFloat(prev.value) : price;
+      const change   = price - prevVal;
+      const changePct= prevVal ? (change / prevVal) * 100 : 0;
+
+      result[item.id] = { price, prevClose: prevVal, change, changePct, lastUpdate: Date.now(), source: 'AlphaVantage', date: latest.date };
+      console.log(`[AV] ${item.fn}: $${price} (${latest.date})`);
+
+      // Small delay between calls to respect rate limits
+      await new Promise(res => setTimeout(res, 200));
+    } catch (e) {
+      console.warn(`[AV] ${item.fn} error:`, e.message);
+    }
+  }
+
+  // Metals from CoinGecko (no AV equivalent on free tier)
+  try {
+    const cgUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${METALS_CG_IDS}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`;
+    const cgR = await fetch(cgUrl, { headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12_000) });
+    if (cgR.ok) {
+      const coins = await cgR.json();
+      if (Array.isArray(coins)) {
+        for (const coin of coins) {
+          const sym = METALS_CG_MAP[coin.id];
+          if (!sym || result[sym]) continue;
+          result[sym] = {
+            price:     coin.current_price || 0,
+            prevClose: (coin.current_price || 0) - (coin.price_change_24h || 0),
+            change:    coin.price_change_24h || 0,
+            changePct: coin.price_change_percentage_24h || 0,
+            lastUpdate: Date.now(),
+            source: 'CoinGecko',
+            image:  coin.image || null,
+          };
+        }
+      }
+    }
+  } catch (e) { console.warn('[commodities] CoinGecko metals error:', e.message); }
+
+  console.log(`[commodities] hourly fetch complete: ${Object.keys(result).length} symbols`);
+  return result;
+}
+
+async function getCommodityData() {
+  const hourKey = getHourKey();
+
+  // Return cached if still same hour
+  if (commodityHourlyCache && commodityHourlyCache.hourKey === hourKey) {
+    return commodityHourlyCache.data;
+  }
+
+  // Deduplicate concurrent fetches
+  if (commodityFetchPromise) return commodityFetchPromise;
+
+  commodityFetchPromise = fetchAlphaVantageAll().then(data => {
+    commodityHourlyCache = { data, hourKey };
+    commodityFetchPromise = null;
+    return data;
+  }).catch(e => {
+    commodityFetchPromise = null;
+    console.error('[commodities] fetch failed:', e.message);
+    return commodityHourlyCache?.data || {};
+  });
+
+  return commodityFetchPromise;
+}
+
+// Pre-warm at server start and then at the top of every hour
+setTimeout(() => getCommodityData(), 5000);
+function scheduleNextHour() {
+  const now = new Date();
+  const msToNextHour = (60 - now.getUTCMinutes()) * 60_000 - now.getUTCSeconds() * 1000 - now.getUTCMilliseconds();
+  setTimeout(() => {
+    getCommodityData();
+    setInterval(() => getCommodityData(), 3_600_000); // every hour
+  }, msToNextHour);
+}
+scheduleNextHour();
+
 app.get('/api/commodities', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  const cacheKey = 'commodities-v2';
-  const cached = getCached(cacheKey);
-  if (cached) return res.json(cached);
-
-  // Verified CoinGecko IDs — all confirmed to exist on CoinGecko
-  // pax-gold = PAXG (1 oz gold), tether-gold = XAUt (gold), 
-  // xaut = same as tether-gold alias, silvercoin tracks silver, 
-  // platinum tracks platinum, wrapped-bitcoin for BTC commodity proxy
-  const COMMODITY_IDS = [
-    'pax-gold',        // PAXG — 1 token backed by 1 troy oz physical gold ✓ confirmed
-    'tether-gold',     // XAUt — Tether gold token ✓ confirmed  
-    'silvercoin',      // SLV — silver tracking token
-    'silver',          // SLVT — another silver token on CoinGecko
-    'platinum',        // XPTX — platinum
-    'xdoge',           // placeholder test
-    'wrapped-bitcoin', // WBTC — BTC as digital commodity
-    'ethereum',        // ETH — digital commodity
-    'chainlink',       // LINK — oracle commodity data token
-  ].join(',');
-
   try {
-    const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COMMODITY_IDS}&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h`, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
-      signal: AbortSignal.timeout(15_000),
-    });
-    const text = await r.text();
-    let coins;
-    try { coins = JSON.parse(text); } catch { coins = []; }
-    if (!Array.isArray(coins)) coins = [];
-
-    console.log(`[commodities] CoinGecko returned ${coins.length} tokens:`, coins.map(c => c.id));
-
-    // Map CoinGecko coin → our commodity symbol key
-    const ID_TO_SYM = {
-      'pax-gold':        'GC=F',
-      'tether-gold':     'GC=F',   // use first gold result only
-      'silvercoin':      'SI=F',
-      'silver':          'SI=F',
-      'platinum':        'PL=F',
-    };
-
-    const result = {};
-    for (const coin of coins) {
-      const sym = ID_TO_SYM[coin.id];
-      if (!sym || result[sym]) continue; // skip if no mapping or already have one
-      result[sym] = {
-        cgId:       coin.id,
-        name:       coin.name,
-        image:      coin.image,
-        price:      coin.current_price || 0,
-        change:     coin.price_change_24h || 0,
-        changePct:  coin.price_change_percentage_24h || 0,
-        high24h:    coin.high_24h || null,
-        low24h:     coin.low_24h || null,
-        lastUpdate: Date.now(),
-      };
-    }
-
-    console.log(`[commodities] mapped ${Object.keys(result).length} symbols:`, Object.keys(result));
-    setCached(cacheKey, result);
-    return res.json(result);
-  } catch (err) {
-    console.error('[commodities]', err.message);
-    return res.status(502).json({ error: err.message });
+    const data = await getCommodityData();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
   }
 });
 

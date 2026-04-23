@@ -927,7 +927,40 @@ async function loadMarkets() {
   const error   = $('markets-error');
   show(loading); hide(error);
   try {
-    marketPairs = await API.getTopPairs();
+    // Fetch DexScreener pairs + Moralis PulseChain top tokens in parallel
+    const [dexPairs, moralisTokens] = await Promise.allSettled([
+      API.getTopPairs(),
+      fetch('/api/moralis/pulsechain/tokens').then(r => r.json()).catch(() => null),
+    ]);
+
+    marketPairs = dexPairs.status === 'fulfilled' ? dexPairs.value : [];
+
+    // Merge Moralis tokens not already in the list (by address)
+    if (moralisTokens.status === 'fulfilled' && moralisTokens.value) {
+      const mv = moralisTokens.value;
+      const tokenArr = Array.isArray(mv) ? mv : (mv.result || mv.tokens || []);
+      const existingAddrs = new Set(marketPairs.map(p => (p.baseToken?.address || '').toLowerCase()));
+
+      for (const tok of tokenArr) {
+        const addr = (tok.token_address || tok.address || '').toLowerCase();
+        if (!addr || existingAddrs.has(addr)) continue;
+        // Build a market-pair-compatible object
+        marketPairs.push({
+          baseToken:   { address: addr, symbol: tok.symbol || '?', name: tok.name || tok.symbol || '?' },
+          quoteToken:  { symbol: 'USD' },
+          priceUsd:    tok.usd_price ? String(tok.usd_price) : '0',
+          priceChange: { h24: tok.price_24h_percent_change || 0 },
+          volume:      { h24: tok.volume_24h_usd || 0 },
+          marketCap:   tok.market_cap_usd || tok.fully_diluted_valuation || 0,
+          fdv:         tok.fully_diluted_valuation || 0,
+          liquidity:   { usd: 0 },
+          pairAddress: null,
+          logoUrl:     tok.logo || tok.thumbnail || null,
+          _moralis:    true,
+        });
+      }
+    }
+
     hide(loading);
     renderMarketList();
   } catch (e) {
@@ -986,7 +1019,8 @@ function buildMarketRow(rank, pair) {
   const token   = pair.baseToken || {};
   const price   = pair.priceUsd;
   const { text: chgText, cls: chgCls } = fmt.change(pair.priceChange?.h24);
-  const logoUrl = API.logoUrl(pair, token.address);
+  // Use Moralis logo if available, otherwise fall back to DexScreener logo
+  const logoUrl = pair.logoUrl || API.logoUrl(pair, token.address);
   const tokenAddr = (token.address || '').toLowerCase();
 
   const row = document.createElement('a');
@@ -2247,102 +2281,21 @@ async function addWatchlistToken() {
    ══════════════════════════════════════════════════════ */
 
 let swapInited = false;
-
-// LibertySwap: cross-chain bridge with quote API
-// API docs: https://docs.libertyswap.finance/resources/liberty-swap-api
-// Base URL: https://api.libertyswap.finance   Version: v1
-// Endpoint: GET /v1/quote?srcToken=USDC&dstToken=USDC&srcChain=8453&dstChain=369&amount=...
-
-const LIBERTY_ROUTERS = new Set([
-  '0xe7ee706a6708b691a232452c9cb267d186942f09', // PulseChain USDC
-  '0x80c2c603d72ea17a0d85b670d4489eb3012035cd', // PulseChain WETH
-  '0x06291eee038e94e8dec2b3bfb6e030c0b5615506', // Ethereum USDC
-  '0x12352b55e0b4305dd83a349a5d7845be9b5a2eea', // Ethereum USDT
-  '0xaa7a195d69327a894eeb969d3bcb89116fc78a14', // Ethereum DAI
-  '0x60fdaf9198efcd6faf27d50e955e1a42905f2eeb', // Ethereum ETH
-  '0x43f403972080406e3e6602793a5072dbc4389bab', // BSC USDC
-  '0xc438d51f296ff3e53d061293d2bc4bb9fb2f7f19', // BSC USDT
-  '0x4e839da8dcd61df10976b926cbf9ab7d06bff072', // BSC USD1
-  '0xefb11856c4be75c276a5c9e286f8032d3e16ced2', // Base USDC
-  '0x05216280d45bb8e8dcb863186e4762090bab7b6f', // Arbitrum USDC
-  '0xcb2b2a70f29a8b7467fa930a09f9271d1ef0e5a9', // Polygon USDC
-]);
-
-// Token decimals for amount conversion
-const LIBERTY_DECIMALS = { USDC: 6, ETH: 18, WETH: 18, USDT: 6, DAI: 18, USD1: 18 };
-
-async function fetchLibertyQuote() {
-  const srcChain = $('lib-src-chain')?.value;
-  const dstChain = $('lib-dst-chain')?.value;
-  const token    = $('lib-token')?.value;
-  const amount   = parseFloat($('lib-amount')?.value);
-
-  const errEl     = $('lib-quote-error');
-  const resultEl  = $('lib-quote-result');
-  const loadingEl = $('lib-quote-loading');
-
-  if (errEl) hide(errEl);
-  if (resultEl) hide(resultEl);
-
-  if (!amount || isNaN(amount) || amount <= 0) {
-    if (errEl) { errEl.textContent = 'Please enter an amount'; show(errEl); } return;
-  }
-  if (srcChain === dstChain) {
-    if (errEl) { errEl.textContent = 'Source and destination chains must be different'; show(errEl); } return;
-  }
-
-  show(loadingEl);
-
-  try {
-    const decimals  = LIBERTY_DECIMALS[token] || 6;
-    const amountWei = BigInt(Math.round(amount * 10 ** decimals)).toString();
-    // Destination token: ETH/WETH maps to WETH on PulseChain, else same symbol
-    const dstToken  = (token === 'ETH' && dstChain === '369') ? 'WETH' : token;
-    const srcToken  = token;
-
-    const qs = new URLSearchParams({ srcToken, dstToken, amount: amountWei, srcChain, dstChain });
-    const res = await fetch(`/api/libertyswap/v1/quote?${qs}`);
-    const data = await res.json();
-
-    hide(loadingEl);
-
-    if (data.error || data.message) {
-      if (errEl) { errEl.textContent = data.error || data.message; show(errEl); } return;
-    }
-
-    // Security: verify router address
-    const routerAddr = (data.to || '').toLowerCase();
-    const isVerified = LIBERTY_ROUTERS.has(routerAddr);
-
-    const srcAmt  = data.srcAmount  ? (Number(data.srcAmount)  / 10 ** (data.srcToken?.decimals  || decimals)).toFixed(4) : '—';
-    const dstAmt  = data.destAmount ? (Number(data.destAmount) / 10 ** (data.destToken?.decimals || decimals)).toFixed(4) : '—';
-    const feePct  = data.fee?.percentage ? `${data.fee.percentage}%` : '—';
-    const feeAmt  = data.fee?.amount ? (Number(data.fee.amount) / 10 ** decimals).toFixed(4) : '—';
-
-    const setText = (id, v) => { const e = $(id); if (e) e.textContent = v; };
-    setText('lib-q-send',    `${srcAmt} ${data.srcToken?.symbol || srcToken}`);
-    setText('lib-q-recv',    `${dstAmt} ${data.destToken?.symbol || dstToken}`);
-    setText('lib-q-fee-pct', feePct);
-    setText('lib-q-fee-amt', `${feeAmt} ${data.srcToken?.symbol || srcToken}`);
-    setText('lib-q-router',  isVerified ? `✓ ${data.to}` : `⚠ UNVERIFIED: ${data.to}`);
-
-    const routerEl = $('lib-q-router');
-    if (routerEl) routerEl.style.color = isVerified ? 'var(--green)' : 'var(--red)';
-
-    show(resultEl);
-  } catch (e) {
-    hide(loadingEl);
-    if (errEl) { errEl.textContent = `Quote failed: ${e.message}`; show(errEl); }
-  }
-}
-
-$('lib-quote-btn')?.addEventListener('click', fetchLibertyQuote);
+let libertyInited = false;
 
 function initSwap() {
-  if (!swapInited) {
-    swapInited = true;
-    const iframe = $('swap-iframe');
-    if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
+  if (activeSwapSubtab === 'libertyswap') {
+    if (!libertyInited) {
+      libertyInited = true;
+      const iframe = $('liberty-iframe');
+      if (iframe) iframe.src = 'https://libertyswap.finance/';
+    }
+  } else {
+    if (!swapInited) {
+      swapInited = true;
+      const iframe = $('swap-iframe');
+      if (iframe) iframe.src = 'https://pulsex.mypinata.cloud/ipfs/bafybeiaq4jgcpz4hdzwid6letizdnhijlp6lu5ivcjcp5vbgpgf54jknn4/';
+    }
   }
 }
 

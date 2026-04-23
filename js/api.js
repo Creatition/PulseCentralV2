@@ -223,9 +223,11 @@ const API = (() => {
 
   async function getCoreCoinPairs() {
     const pairAddrs = CORE_COINS.map(c => c.pair).join(',');
-    const [pairData, snapshots] = await Promise.all([
+    const [pairData, snapshots, moralisPlsPrice] = await Promise.all([
       get(`${DSX}/pairs/pulsechain/${pairAddrs}`).catch(() => ({})),
       get('/api/chart-snapshots').catch(() => ({})),
+      // Use Moralis for reliable PLS price data
+      get('/api/moralis/pls-price').catch(() => null),
     ]);
 
     const byPair = new Map();
@@ -233,23 +235,33 @@ const API = (() => {
       if (p.pairAddress) byPair.set(p.pairAddress.toLowerCase(), p);
     }
 
-    // Fetch live bars for ALL core coins from GeckoTerminal (limit=1000 = ~2.7 years, covers PulseChain launch)
-    // PLS pair is E56043 (DAI/WPLS) — DAI is base so prices are inverted, need invertPrices=true
+    // Fetch live bars for ALL core coins from GeckoTerminal
+    // PLS pair (E56043) is WPLS/DAI — fetch without currency=usd and auto-invert
     const barResults = await Promise.allSettled(
       CORE_COINS.map(coin => {
         const isPLS = coin.symbol === 'PLS';
-        return getChartBars(coin.pair, isPLS); // invert PLS bars since DAI is base token
+        return getChartBars(coin.pair, isPLS);
       })
     );
 
+    // If Moralis gives us PLS price, inject it into the PLS pair data
+    const plsUsdPrice = moralisPlsPrice?.usdPrice || moralisPlsPrice?.usd_price || null;
+
     return CORE_COINS.map((coin, i) => {
       const pair = byPair.get(coin.pair.toLowerCase()) || null;
-      // Use live bars if we got them; fall back to snapshot
       const liveBars = barResults[i].status === 'fulfilled' ? barResults[i].value : [];
       const snapBars = Array.isArray(snapshots.coins?.[coin.symbol]) ? snapshots.coins[coin.symbol] : [];
-      // Pick whichever has more data
       const bars = liveBars.length >= snapBars.length ? liveBars : snapBars;
-      return { ...coin, pair, bars };
+
+      // For PLS: override priceUsd with Moralis price if available
+      let resolvedPair = pair;
+      if (coin.symbol === 'PLS' && plsUsdPrice && pair) {
+        resolvedPair = { ...pair, priceUsd: String(plsUsdPrice) };
+      } else if (coin.symbol === 'PLS' && plsUsdPrice && !pair) {
+        resolvedPair = { priceUsd: String(plsUsdPrice) };
+      }
+
+      return { ...coin, pair: resolvedPair, bars };
     });
   }
 
@@ -325,6 +337,33 @@ const API = (() => {
   }
 
   async function getTokenList(addr) {
+    // Try Moralis first — returns rich data with logos, prices, metadata
+    try {
+      const moralis = await get(`/api/moralis/wallet/${addr}/tokens`, 20000);
+      if (moralis && !moralis.error && Array.isArray(moralis.result)) {
+        const tokens = moralis.result
+          .filter(t => t.symbol && t.balance && t.balance !== '0')
+          .map(t => {
+            const decimals = Number(t.decimals || 18);
+            const rawBal   = BigInt(t.balance || '0');
+            const balance  = Number(rawBal) / Math.pow(10, decimals);
+            return {
+              symbol:          t.symbol,
+              name:            t.name || t.symbol,
+              balance,
+              decimals,
+              contractAddress: t.token_address,
+              logoUrl:         t.logo || t.thumbnail || null,
+              priceUsd:        t.usd_price ? Number(t.usd_price) : null,
+              valueUsd:        t.usd_value ? Number(t.usd_value) : null,
+              source:          'moralis',
+            };
+          });
+        if (tokens.length > 0) return tokens;
+      }
+    } catch (e) { console.warn('[getTokenList] Moralis failed:', e.message); }
+
+    // Fallback: BlockScout
     const data = await get(`${SCAN}?module=account&action=tokenlist&address=${addr}`);
     if (data.status !== '1') {
       if (data.message === 'No tokens found') return [];
@@ -336,6 +375,10 @@ const API = (() => {
       balance:         Number(t.balance) / Math.pow(10, Number(t.decimals)),
       decimals:        Number(t.decimals),
       contractAddress: t.contractAddress,
+      logoUrl:         null,
+      priceUsd:        null,
+      valueUsd:        null,
+      source:          'blockscout',
     }));
   }
 
