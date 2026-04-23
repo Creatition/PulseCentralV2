@@ -269,11 +269,31 @@ const API = (() => {
   /* ── Markets tab ──────────────────────────────────── */
 
   async function getTopPairs() {
-    const SEARCHES = ['PLS', 'PLSX', 'HEX', 'INC', 'WPLS', 'MAXI', 'HDRN', 'ICSA', '9MM', 'PLSD', 'PLSB', 'GENI', 'MINT', 'Atropa', 'SPARK', 'WATT', 'LOAN', '9INCH'];
+    // Expanded search list targeting 200+ PulseChain tokens
+    const SEARCHES = [
+      // Core tokens
+      'PLS', 'PLSX', 'HEX', 'INC', 'WPLS', 'PRVX',
+      // DeFi / lending
+      'MAXI', 'HDRN', 'ICSA', 'LOAN', 'TRIO', 'PHIAT',
+      // DEX tokens
+      '9MM', '9INCH', 'PITEAS', 'PULSEX',
+      // Stable / bridge
+      'USDC', 'USDT', 'DAI', 'WETH', 'WBTC',
+      // Ecosystem
+      'PLSD', 'PLSB', 'PLSR', 'SPARK', 'WATT', 'GENI', 'MINT', 'TEAM',
+      // Community
+      'Atropa', 'BEAR', 'PINU', 'DECI', 'CST', 'BRSCO',
+      // More PulseChain native tokens
+      'PULSE', 'PHEX', 'eHEX', 'PDAI', 'HEX1',
+      'PWORLD', 'PLSP', 'PLSF', 'XEN', 'LUCKY',
+      'AXIS', 'NOPE', 'GOLD', 'FIRE', 'PENT',
+      'MAX', 'MOPS', 'HBURN', 'PITCH', 'ICETH',
+    ];
 
-    const [profiles, boosts, ...searches] = await Promise.allSettled([
+    const [profiles, boosts, moralisTokens, ...searches] = await Promise.allSettled([
       get('/api/dex/token-profiles/latest/v1'),
       get('/api/dex/token-boosts/top/v1'),
+      fetch('/api/moralis/pulsechain/tokens').then(r => r.json()).catch(() => []),
       ...SEARCHES.map(q => get(`${DSX}/search?q=${encodeURIComponent(q)}`)),
     ]);
 
@@ -302,6 +322,13 @@ const API = (() => {
       }
     }
 
+    // Add addresses from Moralis token list (enriches coverage significantly)
+    if (moralisTokens.status === 'fulfilled' && Array.isArray(moralisTokens.value)) {
+      for (const tok of moralisTokens.value) {
+        if (tok.address) allAddrs.add(tok.address);
+      }
+    }
+
     // Add known tokens
     for (const t of KNOWN_TOKENS) allAddrs.add(t.address);
 
@@ -315,9 +342,48 @@ const API = (() => {
       if (!merged.has(addr)) merged.set(addr, pair);
     }
 
-    return [...merged.values()]
-      .filter(p => p && !DENYLIST.has((p.baseToken?.address || '').toLowerCase()) && (p.marketCap || p.fdv || 0) >= 5000)
+    // Also inject Moralis-only tokens that didn't get a DexScreener pair
+    // (gives us more tokens to hit the 200 target)
+    if (moralisTokens.status === 'fulfilled' && Array.isArray(moralisTokens.value)) {
+      for (const tok of moralisTokens.value) {
+        if (!tok.address) continue;
+        const addr = tok.address.toLowerCase();
+        if (merged.has(addr)) {
+          // Enrich existing entry with Moralis logo
+          const existing = merged.get(addr);
+          if (!existing.logoUrl && tok.logo) existing.logoUrl = tok.logo;
+        } else if (tok.priceUsd > 0 || tok.totalLiquidityUsd > 0) {
+          // Add Moralis-only token as a market pair entry
+          merged.set(addr, {
+            baseToken:   { address: addr, symbol: tok.symbol, name: tok.name },
+            quoteToken:  { symbol: 'USD' },
+            priceUsd:    tok.priceUsd ? String(tok.priceUsd) : '0',
+            priceChange: { h24: tok.priceChange24h || 0 },
+            volume:      { h24: tok.volumeUsd24h || 0 },
+            marketCap:   tok.marketCapUsd || 0,
+            fdv:         tok.marketCapUsd || 0,
+            liquidity:   { usd: tok.totalLiquidityUsd || 0 },
+            pairAddress: null,
+            logoUrl:     tok.logo || null,
+            _moralis:    true,
+          });
+        }
+      }
+    }
+
+    const result = [...merged.values()]
+      .filter(p => {
+        if (!p) return false;
+        const addr = (p.baseToken?.address || '').toLowerCase();
+        if (DENYLIST.has(addr)) return false;
+        // For Moralis-only tokens, require some price/liquidity signal
+        if (p._moralis) return parseFloat(p.priceUsd || 0) > 0 || (p.liquidity?.usd || 0) > 100;
+        return (p.marketCap || p.fdv || 0) >= 1000; // lower threshold to get more tokens
+      })
       .sort((a, b) => Number(b.volume?.h24 || 0) - Number(a.volume?.h24 || 0));
+
+    console.log(`[getTopPairs] ${result.length} total PulseChain tokens`);
+    return result;
   }
 
   async function getTrendingPairs() {

@@ -226,14 +226,26 @@ let pcTokensCache = null;
 let pcTokensFetchPromise = null;
 const PC_TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Common search terms to discover PulseChain tokens
+// Comprehensive search terms to discover 200+ PulseChain tokens
 const PC_SEARCH_TERMS = [
-  'PLS', 'PLSX', 'HEX', 'INC', 'PHEX', 'PULSE', 'PULSEX',
-  'MAXI', 'TRIO', 'BASE', 'LOAN', 'HDRN', 'ICSA',
-  'DAI', 'USDC', 'USDT', 'WETH', 'WBTC',
-  '9MM', 'SPARK', 'WATT', 'MINT', 'GENI',
-  'PLSD', 'PLSB', 'PLSR', 'PINU',
-  'Atropa', 'BRSCO', 'CST', 'DECI', 'BEAR',
+  // Core PulseChain tokens
+  'PLS', 'PLSX', 'HEX', 'INC', 'WPLS', 'PRVX',
+  // DeFi ecosystem
+  'MAXI', 'HDRN', 'ICSA', 'TRIO', 'LOAN', 'PHIAT', 'TEAM',
+  // DEX / exchange
+  '9MM', '9INCH', 'PITEAS', 'PULSEX',
+  // Stablecoins / bridges
+  'USDC', 'USDT', 'DAI', 'WETH', 'WBTC',
+  // PulseChain native
+  'PLSD', 'PLSB', 'PLSR', 'PLSP', 'PLSF',
+  // Community tokens
+  'SPARK', 'WATT', 'GENI', 'MINT', 'BRSCO', 'CST',
+  'DECI', 'BEAR', 'PINU', 'Atropa',
+  // More ecosystem
+  'PHEX', 'eHEX', 'PULSE', 'HEX1', 'PDAI',
+  'XEN', 'LUCKY', 'AXIS', 'NOPE', 'GOLD',
+  'FIRE', 'PENT', 'MAX', 'MOPS', 'HBURN',
+  'PITCH', 'ICETH', 'PWORLD',
 ];
 
 async function fetchAllPulseChainTokens() {
@@ -247,7 +259,7 @@ async function fetchAllPulseChainTokens() {
         const url = new URL(`${MORALIS_BASE}/tokens/search`);
         url.searchParams.set('query', term);
         url.searchParams.append('chains[]', PULSECHAIN_ID);
-        url.searchParams.set('limit', '10');
+        url.searchParams.set('limit', '20');
         url.searchParams.set('sortBy', 'liquidity');
         const r = await fetch(url.toString(), {
           headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
@@ -280,7 +292,7 @@ async function fetchAllPulseChainTokens() {
   try {
     const url = new URL(`${MORALIS_BASE}/market-data/erc20s/top-tokens`);
     url.searchParams.set('chain', PULSECHAIN_ID);
-    url.searchParams.set('limit', '100');
+    url.searchParams.set('limit', '200');
     const r = await fetch(url.toString(), {
       headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
       signal: AbortSignal.timeout(15_000),

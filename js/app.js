@@ -344,6 +344,7 @@ function switchTab(name) {
   // market-stats is display-only in nav, not a real tab panel
   if (name === 'markets-stats') return;
   activeTab = name;
+  try { localStorage.setItem('pc-active-tab', name); } catch {}
   document.querySelectorAll('.tab-btn:not(.modal-tab-btn)').forEach(b => {
     const a = b.dataset.tab === name;
     b.classList.toggle('active', a);
@@ -356,7 +357,6 @@ function switchTab(name) {
   if (name === 'portfolio') initPortfolioTab();
   if (name === 'watchlist') loadWatchlistTab();
   if (name === 'swap')      initSwap();
-  if (name === 'pump')      loadPumpTab();
   if (name === 'links')     {}
 }
 
@@ -407,16 +407,18 @@ window.switchSwapSubtab = switchSwapSubtab;
 let activeMarketsSubtab = 'pulsechain';
 function switchMarketsSubtab(subtab) {
   activeMarketsSubtab = subtab;
+  try { localStorage.setItem('pc-active-markets-subtab', subtab); } catch {}
   switchTab('markets');
   document.querySelectorAll('.markets-subtab').forEach(el => {
     el.classList.toggle('hidden', el.id !== `markets-sub-${subtab}`);
     el.classList.toggle('active-subtab', el.id === `markets-sub-${subtab}`);
   });
-  document.querySelectorAll('.tab-dropdown-item').forEach(btn => {
+  document.querySelectorAll('[data-subtab]').forEach(btn => {
     btn.classList.toggle('active-sub', btn.dataset.subtab === subtab);
   });
   if (subtab === 'crypto100')   loadCrypto100();
   if (subtab === 'commodities') loadCommodities();
+  if (subtab === 'pump')        loadPumpTab();
 }
 window.switchMarketsSubtab = switchMarketsSubtab;
 
@@ -928,57 +930,11 @@ async function loadMarkets() {
   show(loading); hide(error);
 
   try {
-    // Fetch Moralis PulseChain tokens (comprehensive) + DexScreener in parallel
-    const [moralisResult, dexResult] = await Promise.allSettled([
-      fetch('/api/moralis/pulsechain/tokens').then(r => r.json()),
-      API.getTopPairs(),
-    ]);
+    // getTopPairs fetches DexScreener + Moralis internally and returns combined list
+    const pairs = await API.getTopPairs();
 
-    // Build address→pair map from DexScreener for liquidity/pair data
-    const dexPairs = dexResult.status === 'fulfilled' ? dexResult.value : [];
-    const dexByAddr = new Map(dexPairs.map(p => [(p.baseToken?.address || '').toLowerCase(), p]));
-
-    // Start with DexScreener pairs (they have the best price/liquidity data)
-    const seen = new Map();
-    for (const pair of dexPairs) {
-      const addr = (pair.baseToken?.address || '').toLowerCase();
-      if (!addr) continue;
-      seen.set(addr, pair);
-    }
-
-    // Merge Moralis tokens — enrich with logo, and add tokens not in DexScreener
-    if (moralisResult.status === 'fulfilled' && Array.isArray(moralisResult.value)) {
-      for (const tok of moralisResult.value) {
-        const addr = tok.address;
-        if (!addr) continue;
-
-        if (seen.has(addr)) {
-          // Enrich existing DexScreener pair with Moralis logo
-          const existing = seen.get(addr);
-          if (!existing.logoUrl && tok.logo) existing.logoUrl = tok.logo;
-        } else {
-          // New token from Moralis not in DexScreener — convert to market-pair shape
-          seen.set(addr, {
-            baseToken:   { address: addr, symbol: tok.symbol, name: tok.name },
-            quoteToken:  { symbol: 'USD' },
-            priceUsd:    tok.priceUsd ? String(tok.priceUsd) : '0',
-            priceChange: { h24: tok.priceChange24h || 0 },
-            volume:      { h24: tok.volumeUsd24h || 0 },
-            marketCap:   tok.marketCapUsd || 0,
-            fdv:         tok.marketCapUsd || 0,
-            liquidity:   { usd: tok.totalLiquidityUsd || 0 },
-            pairAddress: null,
-            logoUrl:     tok.logo || null,
-            _moralis:    true,
-          });
-        }
-      }
-    }
-
-    // Filter: only tokens with a price > 0 or listed on DexScreener
-    marketPairs = [...seen.values()].filter(p =>
-      !p._moralis || parseFloat(p.priceUsd || 0) > 0 || (p.liquidity?.usd || 0) > 100
-    );
+    // Cap at 200 tokens (4 pages of 50) — already sorted by volume
+    marketPairs = pairs.slice(0, 200);
 
     hide(loading);
     renderMarketList();
@@ -1686,9 +1642,15 @@ async function loadPortfolio(address) {
 
     const enriched = active.map((t, i) => {
       const pair  = pairMap.get(t.contractAddress.toLowerCase());
-      const price = Number(pair?.priceUsd || 0);
-      const value = price * t.balance;
-      const logoUrl = API.logoUrl(pair, t.contractAddress);
+      // Use Moralis price if available (from getTokenList), fall back to DexScreener pair price
+      const price = (t.source === 'moralis' && t.priceUsd != null)
+        ? t.priceUsd
+        : Number(pair?.priceUsd || 0);
+      const value = (t.source === 'moralis' && t.valueUsd != null)
+        ? t.valueUsd
+        : price * t.balance;
+      // Use Moralis logo if available, fall back to DexScreener logo
+      const logoUrl = t.logoUrl || API.logoUrl(pair, t.contractAddress);
       const pairAddr = pair?.pairAddress || null;
       const rawSup = supplies[i].status === 'fulfilled' ? supplies[i].value : null;
       const totalSup = rawSup ? Number(rawSup) / Math.pow(10, t.decimals) : null;
@@ -2413,17 +2375,28 @@ function renderPumpTokens() {
   let tokens = [...pumpAllTokens];
 
   if (pumpSubtab === 'hot') {
-    // Sort by 24h volume
-    tokens = tokens.sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0)).slice(0, 50);
-  } else if (pumpSubtab === 'new') {
-    // Sort by creation time (newest first)
+    // Sort by 24h volume, show top 50
     tokens = tokens
-      .filter(t => t.createdAt)
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      .concat(tokens.filter(t => !t.createdAt))
+      .filter(t => t.priceUsd > 0 || t.volume24h > 0)
+      .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
       .slice(0, 50);
+  } else if (pumpSubtab === 'new') {
+    // Sort by pairCreatedAt timestamp descending — newest pair first (most recently reached DexScreener)
+    // pairCreatedAt is a Unix millisecond timestamp from DexScreener
+    tokens = tokens
+      .sort((a, b) => {
+        const ta = a.createdAt ? Number(a.createdAt) : 0;
+        const tb = b.createdAt ? Number(b.createdAt) : 0;
+        return tb - ta; // descending: newest first
+      })
+      .slice(0, 50);
+  } else {
+    // 'all' — top 100 by market cap descending
+    tokens = tokens
+      .filter(t => t.priceUsd > 0 || t.marketCap > 0)
+      .sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0))
+      .slice(0, 100);
   }
-  // 'all' — show all sorted by liquidity
 
   tokens.forEach((tok, i) => {
     const { text: chgText, cls: chgCls } = fmt.change(tok.priceChange24h || 0);
@@ -2441,7 +2414,7 @@ function renderPumpTokens() {
     rankEl.className = 'market-rank';
     rankEl.textContent = i + 1;
 
-    // Token col with logo + badge
+    // Token col with logo + badge + watchlist star
     const tokenCol = document.createElement('span');
     tokenCol.className = 'market-token';
     const img = document.createElement('img');
@@ -2449,11 +2422,12 @@ function renderPumpTokens() {
     img.src = tok.logo || '';
     img.alt = tok.symbol || '';
     img.onerror = () => { img.src = ''; img.style.background = 'var(--primary-dim)'; };
+
     const nameWrap = document.createElement('div');
-    nameWrap.style.minWidth = '0';
+    nameWrap.style.cssText = 'min-width:0;flex:1;';
     const nm = document.createElement('div');
     nm.className = 'market-token-name';
-    nm.style.display = 'flex'; nm.style.alignItems = 'center'; nm.style.gap = '.35rem';
+    nm.style.cssText = 'display:flex;align-items:center;gap:.35rem;';
     nm.innerHTML = `<span>${escHtml(tok.name || tok.symbol)}</span>`;
     if (tok.launchedOnPumpTires) {
       const badge = document.createElement('span');
@@ -2465,7 +2439,28 @@ function renderPumpTokens() {
     sm.className = 'market-token-sym';
     sm.textContent = tok.symbol || '?';
     nameWrap.append(nm, sm);
-    tokenCol.append(img, nameWrap);
+
+    // Watchlist star
+    const tokAddr = (tok.address || '').toLowerCase();
+    const starBtn = document.createElement('button');
+    starBtn.className = `star-btn${Watchlist.hasToken(tokAddr) ? ' active' : ''}`;
+    starBtn.style.cssText = 'width:28px;height:28px;font-size:.95rem;margin-left:.25rem;flex-shrink:0;';
+    starBtn.textContent = Watchlist.hasToken(tokAddr) ? '★' : '☆';
+    starBtn.title = Watchlist.hasToken(tokAddr) ? 'Remove from watchlist' : 'Add to watchlist';
+    starBtn.onclick = e => {
+      e.stopPropagation();
+      if (Watchlist.hasToken(tokAddr)) {
+        Watchlist.removeToken(tokAddr);
+        starBtn.textContent = '☆'; starBtn.classList.remove('active');
+        starBtn.title = 'Add to watchlist';
+      } else {
+        Watchlist.addToken({ address: tokAddr, symbol: tok.symbol || '?', name: tok.name || tok.symbol || '?', logoUrl: tok.logo || null });
+        starBtn.textContent = '★'; starBtn.classList.add('active');
+        starBtn.title = 'Remove from watchlist';
+      }
+    };
+
+    tokenCol.append(img, nameWrap, starBtn);
 
     const mkCol = (val, cls = '') => {
       const s = document.createElement('span');
@@ -2482,7 +2477,7 @@ function renderPumpTokens() {
       chgCol,
       mkCol(tok.marketCap ? fmt.large(tok.marketCap) : '—', 'hide-mobile'),
       mkCol(tok.volume24h ? fmt.large(tok.volume24h) : '—', 'hide-mobile'),
-      mkCol(tok.liquidity  ? fmt.large(tok.liquidity)  : '—', 'hide-mobile'),
+      mkCol(tok.liquidity  ? fmt.large(tok.liquidity) : '—', 'hide-mobile'),
     );
     rows.appendChild(row);
   });
@@ -2828,4 +2823,38 @@ async function loadModalWhales() {
    INITIAL LOAD
    ══════════════════════════════════════════════════════ */
 
-switchTab('home');
+// Restore the last active tab and markets subtab from localStorage
+(function restoreLastTab() {
+  let lastTab = 'home';
+  let lastMarketsSub = 'pulsechain';
+  try {
+    lastTab = localStorage.getItem('pc-active-tab') || 'home';
+    lastMarketsSub = localStorage.getItem('pc-active-markets-subtab') || 'pulsechain';
+  } catch {}
+
+  // Valid tab names (no longer includes 'pump' as standalone)
+  const validTabs = ['home', 'markets', 'portfolio', 'watchlist', 'swap', 'links'];
+  if (!validTabs.includes(lastTab)) lastTab = 'home';
+
+  const validMarketsSubs = ['pulsechain', 'pump', 'crypto100', 'commodities'];
+  if (!validMarketsSubs.includes(lastMarketsSub)) lastMarketsSub = 'pulsechain';
+
+  if (lastTab === 'markets') {
+    // Need to activate the right markets subtab
+    activeMarketsSubtab = lastMarketsSub;
+    switchTab('markets');
+    // Activate the right subtab visually and load its data
+    document.querySelectorAll('.markets-subtab').forEach(el => {
+      el.classList.toggle('hidden', el.id !== `markets-sub-${lastMarketsSub}`);
+      el.classList.toggle('active-subtab', el.id === `markets-sub-${lastMarketsSub}`);
+    });
+    document.querySelectorAll('[data-subtab]').forEach(btn => {
+      btn.classList.toggle('active-sub', btn.dataset.subtab === lastMarketsSub);
+    });
+    if (lastMarketsSub === 'crypto100')   loadCrypto100();
+    else if (lastMarketsSub === 'commodities') loadCommodities();
+    else if (lastMarketsSub === 'pump')   loadPumpTab();
+  } else {
+    switchTab(lastTab);
+  }
+})();

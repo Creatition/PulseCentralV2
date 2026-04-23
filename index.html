@@ -32,6 +32,9 @@
         <button class="tab-dropdown-item active-sub" data-subtab="pulsechain" onclick="switchMarketsSubtab('pulsechain')">
           ⚡ PulseChain
         </button>
+        <button class="tab-dropdown-item" data-subtab="pump" onclick="switchMarketsSubtab('pump')">
+          🚀 Pump.Tires
+        </button>
         <button class="tab-dropdown-item" data-subtab="crypto100" onclick="switchMarketsSubtab('crypto100')">
           🌐 Crypto Top 100
         </button>
@@ -65,10 +68,7 @@
         </a>
       </div>
     </div>
-    <button class="tab-btn" data-tab="pump" role="tab" aria-selected="false" aria-controls="tab-pump">
-      <span aria-hidden="true">🚀</span><span class="tab-label">Pump.Tires</span>
-    </button>
-    <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
+<button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
       <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
     </button>
     <button class="tab-btn" data-tab="markets-stats" role="tab" aria-selected="false" aria-controls="tab-markets-stats">
@@ -225,6 +225,47 @@
           <span id="page-info-bot" aria-live="polite"></span>
           <button class="btn btn-ghost btn-sm" id="next-btn-bot" aria-label="Next page">Next →</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Sub-tab: Pump.Tires (in Markets) -->
+    <div id="markets-sub-pump" class="markets-subtab hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div class="page-title">Pump.Tires</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <a class="btn btn-ghost btn-sm" href="https://pump.tires" target="_blank" rel="noopener">↗ Open pump.tires</a>
+          <button class="btn btn-ghost btn-sm" id="pump-refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="page-subtitle">New &amp; trending tokens launched on pump.tires · PulseChain launchpad</div>
+
+      <!-- Sub-tabs: Hot / New / All -->
+      <div class="pump-subtabs" id="pump-subtabs">
+        <button class="pump-subtab-btn active" data-pumpsub="hot">🔥 Hot</button>
+        <button class="pump-subtab-btn" data-pumpsub="new">✨ New</button>
+        <button class="pump-subtab-btn" data-pumpsub="all">📋 All</button>
+      </div>
+
+      <!-- Loading/error -->
+      <div class="page-loader" id="pump-loading"><div class="spinner"></div><div>Fetching pump.tires tokens…</div></div>
+      <div class="error-banner hidden" id="pump-error" role="alert"></div>
+
+      <!-- Token grid -->
+      <div class="hidden" id="pump-list">
+        <div class="market-header" role="row">
+          <span>#</span>
+          <span>Token</span>
+          <span class="r">Price</span>
+          <span class="r">24h</span>
+          <span class="r hide-mobile">Market Cap</span>
+          <span class="r hide-mobile">Volume 24h</span>
+          <span class="r hide-mobile">Liquidity</span>
+        </div>
+        <div id="pump-rows"></div>
+      </div>
+
+      <div class="hidden" id="pump-empty" style="text-align:center;padding:3rem;color:var(--text-2);">
+        🚀 No tokens found yet. Try refreshing.
       </div>
     </div>
 
@@ -521,48 +562,6 @@
 <!-- ═══════════════════════════════════════════════════
      PUMP.TIRES TAB
      ═══════════════════════════════════════════════════ -->
-<div id="tab-pump" class="tab-panel" role="tabpanel">
-  <div class="page">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
-      <div class="page-title">Pump.Tires</div>
-      <div style="display:flex;align-items:center;gap:.5rem;">
-        <a class="btn btn-ghost btn-sm" href="https://pump.tires" target="_blank" rel="noopener">↗ Open pump.tires</a>
-        <button class="btn btn-ghost btn-sm" id="pump-refresh-btn">↻ Refresh</button>
-      </div>
-    </div>
-    <div class="page-subtitle">New & trending tokens launched on pump.tires · PulseChain launchpad</div>
-
-    <!-- Sub-tabs: Hot / New / All -->
-    <div class="pump-subtabs" id="pump-subtabs">
-      <button class="pump-subtab-btn active" data-pumpsub="hot">🔥 Hot</button>
-      <button class="pump-subtab-btn" data-pumpsub="new">✨ New</button>
-      <button class="pump-subtab-btn" data-pumpsub="all">📋 All</button>
-    </div>
-
-    <!-- Loading/error -->
-    <div class="page-loader" id="pump-loading"><div class="spinner"></div><div>Fetching pump.tires tokens…</div></div>
-    <div class="error-banner hidden" id="pump-error" role="alert"></div>
-
-    <!-- Token grid -->
-    <div class="hidden" id="pump-list">
-      <div class="market-header pump-header" role="row">
-        <span>#</span>
-        <span>Token</span>
-        <span class="r">Price</span>
-        <span class="r">24h</span>
-        <span class="r hide-mobile">Market Cap</span>
-        <span class="r hide-mobile">Volume 24h</span>
-        <span class="r hide-mobile">Liquidity</span>
-      </div>
-      <div id="pump-rows"></div>
-    </div>
-
-    <div class="hidden" id="pump-empty" style="text-align:center;padding:3rem;color:var(--text-2);">
-      🚀 No tokens found yet. Try refreshing.
-    </div>
-  </div>
-</div>
-
 <!-- ═══════════════════════════════════════════════════
      LINKS TAB
      ═══════════════════════════════════════════════════ -->
