@@ -760,56 +760,78 @@ function buildCoinCard(coin) {
     statsRow.appendChild(s);
   });
 
-  // Chart area
+  // Chart area — PLS gets a live DexScreener embedded chart; others get SVG chart
   const chartArea = document.createElement('div');
   chartArea.className = 'coin-chart-area';
 
-  const tfBar = document.createElement('div');
-  tfBar.className = 'coin-chart-tf';
-  const TFS = [{ l: '7D', d: 7 }, { l: '30D', d: 30 }, { l: '90D', d: 90 }, { l: 'ALL', d: 9999 }];
-  let activeTf = 'ALL';
+  if (isPls && pairAddr) {
+    // DexScreener embedded chart iframe for PLS — fully interactive live chart
+    const dsWrap = document.createElement('div');
+    dsWrap.className = 'coin-dex-chart-wrap';
+    const dsIframe = document.createElement('iframe');
+    dsIframe.src = `https://dexscreener.com/pulsechain/${pairAddr}?embed=1&theme=dark&info=0&trades=0`;
+    dsIframe.title = 'PLS/PulseChain live chart';
+    dsIframe.allow = 'clipboard-write';
+    dsIframe.loading = 'lazy';
+    dsIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups');
+    dsWrap.appendChild(dsIframe);
 
-  const chartSlot = document.createElement('div');
-  const dateLbl   = document.createElement('div');
-  dateLbl.className = 'coin-chart-date';
+    const dexLink = document.createElement('a');
+    dexLink.className = 'coin-dex-link';
+    dexLink.href = `https://dexscreener.com/pulsechain/${pairAddr}`;
+    dexLink.target = '_blank'; dexLink.rel = 'noopener';
+    dexLink.textContent = '📈 Open full chart on DexScreener ↗';
 
-  function renderChart(tfd) {
-    activeTf = tfd.l;
-    tfBar.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tfd.l));
-    chartSlot.innerHTML = '';
-    const filtered = filterBars(bars, tfd.d);
-    const svg = buildChartSvg(filtered, color);
-    if (svg) {
-      chartSlot.appendChild(svg);
-      dateLbl.textContent = dateLabel(filtered);
-    } else {
-      const no = document.createElement('div');
-      no.className = 'coin-chart-nodata';
-      no.textContent = bars && bars.length > 0 ? 'Not enough data for this range' : 'Chart loading…';
-      chartSlot.appendChild(no);
-      dateLbl.textContent = '';
+    chartArea.append(dsWrap, dexLink);
+  } else {
+    // SVG sparkline chart for all other coins
+    const tfBar = document.createElement('div');
+    tfBar.className = 'coin-chart-tf';
+    const TFS = [{ l: '7D', d: 7 }, { l: '30D', d: 30 }, { l: '90D', d: 90 }, { l: 'ALL', d: 9999 }];
+    let activeTf = 'ALL';
+
+    const chartSlot = document.createElement('div');
+    const dateLbl   = document.createElement('div');
+    dateLbl.className = 'coin-chart-date';
+
+    function renderChart(tfd) {
+      activeTf = tfd.l;
+      tfBar.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tfd.l));
+      chartSlot.innerHTML = '';
+      const filtered = filterBars(bars, tfd.d);
+      const svg = buildChartSvg(filtered, color);
+      if (svg) {
+        chartSlot.appendChild(svg);
+        dateLbl.textContent = dateLabel(filtered);
+      } else {
+        const no = document.createElement('div');
+        no.className = 'coin-chart-nodata';
+        no.textContent = bars && bars.length > 0 ? 'Not enough data for this range' : 'Chart loading…';
+        chartSlot.appendChild(no);
+        dateLbl.textContent = '';
+      }
     }
+
+    TFS.forEach(tf => {
+      const btn = document.createElement('button');
+      btn.className = 'tf-btn';
+      btn.dataset.tf = tf.l;
+      btn.textContent = tf.l;
+      btn.onclick = () => renderChart(tf);
+      tfBar.appendChild(btn);
+    });
+
+    renderChart(TFS[3]); // default ALL
+
+    const dexLink = document.createElement('a');
+    dexLink.className = 'coin-dex-link';
+    dexLink.href = pairAddr ? `https://dexscreener.com/pulsechain/${pairAddr}` : 'https://dexscreener.com/pulsechain';
+    dexLink.target = '_blank'; dexLink.rel = 'noopener';
+    dexLink.textContent = '📈 Full chart on DexScreener ↗';
+
+    chartArea.append(tfBar, chartSlot, dateLbl, dexLink);
   }
 
-  TFS.forEach(tf => {
-    const btn = document.createElement('button');
-    btn.className = 'tf-btn';
-    btn.dataset.tf = tf.l;
-    btn.textContent = tf.l;
-    btn.onclick = () => renderChart(tf);
-    tfBar.appendChild(btn);
-  });
-
-  renderChart(TFS[3]); // default ALL
-
-  // DexScreener link
-  const dexLink = document.createElement('a');
-  dexLink.className = 'coin-dex-link';
-  dexLink.href = pairAddr ? `https://dexscreener.com/pulsechain/${pairAddr}` : 'https://dexscreener.com/pulsechain';
-  dexLink.target = '_blank'; dexLink.rel = 'noopener';
-  dexLink.textContent = '📈 Full chart on DexScreener ↗';
-
-  chartArea.append(tfBar, chartSlot, dateLbl, dexLink);
   card.append(head, statsRow, chartArea);
   return card;
 }
@@ -1233,10 +1255,10 @@ function renderC100SearchResults(pairs) {
     const stats = document.createElement('div');
     stats.className = 'search-item-stats';
     const priceEl = document.createElement('div'); priceEl.className = 'search-item-price'; priceEl.textContent = pair.priceUsd ? fmt.price(pair.priceUsd) : '—';
-    const chgEl   = document.createElement('div'); chgEl.className = `badge badge-${chgCls}`; chgEl.style.float = 'right'; chgEl.textContent = chgText;
+    const chgEl   = document.createElement('div'); chgEl.className = `badge badge-${chgCls}`; chgEl.textContent = chgText;
     const liqVal  = pair.liquidity?.usd;
     const liqEl   = document.createElement('div'); liqEl.className = 'search-item-liq'; liqEl.textContent = liqVal ? `Liq ${fmt.large(liqVal)}` : '';
-    stats.append(priceEl, chgEl, liqEl);
+    stats.append(liqEl, priceEl, chgEl);
 
     a.append(logo, info, stats);
     c100SearchDrop.appendChild(a);
@@ -1470,10 +1492,10 @@ function renderSearchResults(pairs) {
     const stats = document.createElement('div');
     stats.className = 'search-item-stats';
     const priceEl = document.createElement('div'); priceEl.className = 'search-item-price'; priceEl.textContent = pair.priceUsd ? fmt.price(pair.priceUsd) : '—';
-    const chgEl   = document.createElement('div'); chgEl.className = `badge badge-${chgCls}`; chgEl.style.float = 'right'; chgEl.textContent = chgText;
+    const chgEl   = document.createElement('div'); chgEl.className = `badge badge-${chgCls}`; chgEl.textContent = chgText;
     const liqVal  = pair.liquidity?.usd;
     const liqEl   = document.createElement('div'); liqEl.className = 'search-item-liq'; liqEl.textContent = liqVal ? `Liq ${fmt.large(liqVal)}` : '';
-    stats.append(priceEl, chgEl, liqEl);
+    stats.append(liqEl, priceEl, chgEl);
 
     a.append(logo, info, stats);
     searchDrop.appendChild(a);
