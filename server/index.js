@@ -658,7 +658,7 @@ const SNAPSHOT_FILE = path.join(__dirname, 'data', 'chart-snapshots.json');
 
 // Coins to snapshot: PLS, PLSX, HEX, INC, PRVX
 const SNAPSHOT_COINS = [
-  { symbol: 'PLS',  pair: '0xE56043671df55dE5CDf8459710433C10324DE0aE' }, // WPLS/USDC — PLS price in USD
+  { symbol: 'PLS',  pair: '0x6753560538ECa67617a9Ce605178F788bE7E524e' }, // WPLS/USDC on PulseX — PLS is base, currency=usd gives PLS price directly
   { symbol: 'PLSX', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9' },
   { symbol: 'HEX',  pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65' },
   { symbol: 'INC',  pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa' },
@@ -736,8 +736,9 @@ async function buildSnapshot() {
   const coins    = {};
   await Promise.all(SNAPSHOT_COINS.map(async ({ symbol, pair }) => {
     try {
-      // Pass invertPrices=true for PLS (WPLS/DAI pool, need raw ratio)
-      const bars = await fetchGeckoBars(pair, symbol === 'PLS');
+      // All pairs now use currency=usd with no inversion needed
+      // PLS uses WPLS/USDC pair (WPLS is base token, so price is in USD directly)
+      const bars = await fetchGeckoBars(pair, false);
       coins[symbol] = bars;
       console.log(`[snapshot] ${symbol}: ${coins[symbol].length} bars`);
     } catch (err) {
@@ -772,6 +773,192 @@ app.get('/api/chart-snapshots', (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json(data);
 });
+
+
+/* ── Pump.Tires tokens via Moralis + DexScreener ───── */
+// pump.tires is a PulseChain token launchpad
+// We fetch new/hot tokens using DexScreener search filtered to recently-added
+// and supplement with Moralis for wallet data and token metadata
+
+let pumpTokensCache = null;
+let pumpTokensPromise = null;
+const PUMP_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+// Known pump.tires deployer/factory address (tokens launched on the platform)
+const PUMP_TIRES_FACTORY = '0xba5fee6e6b166a4b68b875f8a2dda96e7c35a73f'; // pump.tires factory on PulseChain
+
+async function fetchPumpTiresTokens() {
+  const results = new Map();
+
+  // Strategy 1: DexScreener search for pump.tires tokens (searches by platform name)
+  const dexSearches = ['pump.tires', 'pumptires', 'PUMP'];
+  await Promise.allSettled(dexSearches.map(async q => {
+    try {
+      const r = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      for (const pair of (data.pairs || [])) {
+        if (pair.chainId !== 'pulsechain') continue;
+        const addr = (pair.baseToken?.address || '').toLowerCase();
+        if (!addr || results.has(addr)) continue;
+        results.set(addr, {
+          address:     addr,
+          symbol:      pair.baseToken?.symbol || '?',
+          name:        pair.baseToken?.name || pair.baseToken?.symbol || '?',
+          logo:        pair.info?.imageUrl || `https://dd.dexscreener.com/ds-data/tokens/pulsechain/${addr}.png`,
+          priceUsd:    parseFloat(pair.priceUsd || 0) || 0,
+          priceChange24h: parseFloat(pair.priceChange?.h24 || 0) || 0,
+          volume24h:   parseFloat(pair.volume?.h24 || 0) || 0,
+          liquidity:   parseFloat(pair.liquidity?.usd || 0) || 0,
+          marketCap:   parseFloat(pair.marketCap || pair.fdv || 0) || 0,
+          pairAddress: pair.pairAddress || null,
+          launchedOnPumpTires: true,
+          createdAt:   pair.pairCreatedAt || null,
+          txns24h:     (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0),
+          source:      'dexscreener',
+        });
+      }
+    } catch(e) { console.warn('[pump.tires] dex search error:', e.message); }
+  }));
+
+  // Strategy 2: Moralis token search for pump.tires tokens
+  try {
+    const url = new URL(`${MORALIS_BASE}/tokens/search`);
+    url.searchParams.set('query', 'pump');
+    url.searchParams.append('chains[]', PULSECHAIN_ID);
+    url.searchParams.set('limit', '20');
+    url.searchParams.set('sortBy', 'volume');
+    const r = await fetch(url.toString(), {
+      headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const tok of (data?.result || [])) {
+        const chainId = (tok.chainId || '').toLowerCase();
+        if (chainId && chainId !== '0x171' && chainId !== '369') continue;
+        const addr = (tok.tokenAddress || tok.address || '').toLowerCase();
+        if (!addr || results.has(addr)) continue;
+        results.set(addr, {
+          address:     addr,
+          symbol:      tok.symbol || '?',
+          name:        tok.name || tok.symbol || '?',
+          logo:        tok.logo || tok.thumbnail || `https://dd.dexscreener.com/ds-data/tokens/pulsechain/${addr}.png`,
+          priceUsd:    parseFloat(tok.usdPrice || 0) || 0,
+          priceChange24h: parseFloat(tok.usdPricePercentChange?.oneDay || 0) || 0,
+          volume24h:   parseFloat(tok.volumeUsd?.oneDay || 0) || 0,
+          liquidity:   parseFloat(tok.totalLiquidityUsd || 0) || 0,
+          marketCap:   parseFloat(tok.marketCap || tok.fullyDilutedValuation || 0) || 0,
+          pairAddress: null,
+          launchedOnPumpTires: true,
+          createdAt:   null,
+          txns24h:     0,
+          source:      'moralis',
+        });
+      }
+    }
+  } catch(e) { console.warn('[pump.tires] moralis search error:', e.message); }
+
+  // Sort by volume then liquidity, newest first
+  const sorted = [...results.values()]
+    .filter(t => t.priceUsd > 0 || t.liquidity > 0)
+    .sort((a, b) => (b.volume24h - a.volume24h) || (b.liquidity - a.liquidity));
+
+  console.log(`[pump.tires] ${sorted.length} tokens`);
+  return sorted;
+}
+
+app.get('/api/pump-tires/tokens', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  if (pumpTokensCache && (Date.now() - pumpTokensCache.ts < PUMP_CACHE_TTL)) {
+    return res.json(pumpTokensCache.data);
+  }
+  if (pumpTokensPromise) {
+    try { return res.json(await pumpTokensPromise); } catch { return res.status(502).json({ error: 'Fetch failed' }); }
+  }
+  pumpTokensPromise = fetchPumpTiresTokens();
+  try {
+    const data = await pumpTokensPromise;
+    pumpTokensCache = { data, ts: Date.now() };
+    pumpTokensPromise = null;
+    return res.json(data);
+  } catch(e) {
+    pumpTokensPromise = null;
+    return res.status(502).json({ error: e.message });
+  }
+});
+
+/* ── Moralis: auto-discover new PulseChain tokens ─── */
+// Store all discovered PulseChain tokens persistently in memory (no limit)
+// Updated every 10 minutes, merging new tokens in
+
+let pulseTokenLibrary = new Map(); // addr → token
+let libraryLastUpdate = 0;
+const LIBRARY_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+async function updatePulseTokenLibrary() {
+  console.log('[token-library] Updating...');
+  const newTokens = await fetchAllPulseChainTokens().catch(e => {
+    console.warn('[token-library] fetch error:', e.message);
+    return [];
+  });
+
+  let added = 0;
+  for (const tok of newTokens) {
+    if (!pulseTokenLibrary.has(tok.address)) {
+      pulseTokenLibrary.set(tok.address, tok);
+      added++;
+    } else {
+      // Update price data on existing tokens
+      pulseTokenLibrary.set(tok.address, { ...pulseTokenLibrary.get(tok.address), ...tok });
+    }
+  }
+  libraryLastUpdate = Date.now();
+  console.log(`[token-library] ${added} new tokens added, total: ${pulseTokenLibrary.size}`);
+}
+
+// Start updating immediately and then every 10 minutes
+setTimeout(() => updatePulseTokenLibrary(), 8000);
+setInterval(() => updatePulseTokenLibrary(), LIBRARY_UPDATE_INTERVAL);
+
+app.get('/api/pulsechain/token-library', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const page     = parseInt(req.query.page || '1', 10);
+  const pageSize = parseInt(req.query.pageSize || '100', 10);
+  const sortBy   = req.query.sortBy || 'liquidity'; // liquidity | volume | marketCap
+  const search   = (req.query.q || '').toLowerCase();
+
+  let tokens = [...pulseTokenLibrary.values()];
+
+  if (search) {
+    tokens = tokens.filter(t =>
+      t.symbol?.toLowerCase().includes(search) ||
+      t.name?.toLowerCase().includes(search) ||
+      t.address?.includes(search)
+    );
+  }
+
+  tokens.sort((a, b) => {
+    if (sortBy === 'volume')    return (b.volumeUsd24h || 0) - (a.volumeUsd24h || 0);
+    if (sortBy === 'marketCap') return (b.marketCapUsd || 0) - (a.marketCapUsd || 0);
+    return (b.totalLiquidityUsd || 0) - (a.totalLiquidityUsd || 0);
+  });
+
+  const total = tokens.length;
+  const slice = tokens.slice((page - 1) * pageSize, page * pageSize);
+
+  res.json({
+    total,
+    page,
+    pageSize,
+    lastUpdate: libraryLastUpdate,
+    tokens: slice,
+  });
+});
+
 
 /* ── Static files ─────────────────────────────────────── */
 

@@ -65,6 +65,9 @@
         </a>
       </div>
     </div>
+    <button class="tab-btn" data-tab="pump" role="tab" aria-selected="false" aria-controls="tab-pump">
+      <span aria-hidden="true">🚀</span><span class="tab-label">Pump.Tires</span>
+    </button>
     <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
       <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
     </button>
@@ -227,17 +230,18 @@
 
     <!-- Sub-tab: Crypto Top 100 -->
     <div id="markets-sub-crypto100" class="markets-subtab hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.25rem;">
-        <div class="page-title" style="margin-bottom:0">Crypto Top 100</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div class="page-title">Crypto Top 100</div>
         <button class="btn btn-ghost btn-sm" id="crypto100-refresh-btn">↻ Refresh</button>
       </div>
-      <div class="page-subtitle" style="margin-bottom:1.25rem;">Top 100 cryptocurrencies by market cap</div>
+      <div class="page-subtitle">Top 100 cryptocurrencies by market cap</div>
 
-      <!-- Search -->
-      <div class="market-toolbar" style="margin-bottom:1rem;">
+      <!-- Search (DexScreener cross-chain + local CG filter) -->
+      <div class="market-toolbar">
         <div class="search-wrap">
           <span class="search-icon" aria-hidden="true">🔍</span>
-          <input type="search" class="input search-input" id="crypto100-search" placeholder="Search crypto by name or symbol…" autocomplete="off" spellcheck="false" aria-label="Search crypto">
+          <input type="search" class="input search-input" id="crypto100-search" placeholder="Search all tokens across all chains…" autocomplete="off" spellcheck="false" aria-label="Search tokens">
+          <div class="search-dropdown hidden" id="crypto100-search-dropdown" role="listbox" aria-label="Search results"></div>
         </div>
       </div>
 
@@ -259,8 +263,8 @@
 
     <!-- Sub-tab: Commodities -->
     <div id="markets-sub-commodities" class="markets-subtab hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.25rem;">
-        <div class="page-title" style="margin-bottom:0">Commodities</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div class="page-title">Commodities</div>
         <div style="display:flex;align-items:center;gap:.5rem;">
           <span id="commodities-timestamp" style="font-size:.72rem;color:var(--text-3);"></span>
           <button class="btn btn-ghost btn-sm" id="commodities-refresh-btn">↻ Refresh</button>
@@ -428,8 +432,8 @@
      ═══════════════════════════════════════════════════ -->
 <div id="tab-watchlist" class="tab-panel" role="tabpanel">
   <div class="page">
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.25rem;flex-wrap:wrap;">
-      <div class="page-title" style="margin-bottom:0;">Watchlist</div>
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+      <div class="page-title">Watchlist</div>
       <span class="badge badge-neu" id="wl-count" style="font-size:.78rem;">0</span>
     </div>
     <div class="page-subtitle">Star any token on Home or Markets to add it here.</div>
@@ -510,6 +514,52 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PUMP.TIRES TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-pump" class="tab-panel" role="tabpanel">
+  <div class="page">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+      <div class="page-title">Pump.Tires</div>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <a class="btn btn-ghost btn-sm" href="https://pump.tires" target="_blank" rel="noopener">↗ Open pump.tires</a>
+        <button class="btn btn-ghost btn-sm" id="pump-refresh-btn">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="page-subtitle">New & trending tokens launched on pump.tires · PulseChain launchpad</div>
+
+    <!-- Sub-tabs: Hot / New / All -->
+    <div class="pump-subtabs" id="pump-subtabs">
+      <button class="pump-subtab-btn active" data-pumpsub="hot">🔥 Hot</button>
+      <button class="pump-subtab-btn" data-pumpsub="new">✨ New</button>
+      <button class="pump-subtab-btn" data-pumpsub="all">📋 All</button>
+    </div>
+
+    <!-- Loading/error -->
+    <div class="page-loader" id="pump-loading"><div class="spinner"></div><div>Fetching pump.tires tokens…</div></div>
+    <div class="error-banner hidden" id="pump-error" role="alert"></div>
+
+    <!-- Token grid -->
+    <div class="hidden" id="pump-list">
+      <div class="market-header pump-header" role="row">
+        <span>#</span>
+        <span>Token</span>
+        <span class="r">Price</span>
+        <span class="r">24h</span>
+        <span class="r hide-mobile">Market Cap</span>
+        <span class="r hide-mobile">Volume 24h</span>
+        <span class="r hide-mobile">Liquidity</span>
+      </div>
+      <div id="pump-rows"></div>
+    </div>
+
+    <div class="hidden" id="pump-empty" style="text-align:center;padding:3rem;color:var(--text-2);">
+      🚀 No tokens found yet. Try refreshing.
+    </div>
   </div>
 </div>
 

@@ -23,8 +23,8 @@ const API = (() => {
 
   /* ── Core coins shown on Home tab ────────────────── */
   const CORE_COINS = [
-    // PLS pair: WPLS/USDC on PulseX — shows PLS price in USD correctly (PLS is base token)
-    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0xE56043671df55dE5CDf8459710433C10324DE0aE', color: '#7b2fff' },
+    // PLS: E56043 pair for DexScreener price. chartPair=WPLS/USDC gives clean USD bars (no inversion needed)
+    { symbol: 'PLS',  address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', pair: '0xE56043671df55dE5CDf8459710433C10324DE0aE', chartPair: '0x6753560538ECa67617a9Ce605178F788bE7E524e', color: '#7b2fff' },
     { symbol: 'PLSX', address: '0x95B303987A60C71504D99Aa1b13B4DA07b0790ab', pair: '0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9', color: '#ff6d00' },
     { symbol: 'HEX',  address: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39', pair: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65', color: '#e8002d' },
     { symbol: 'INC',  address: '0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d', pair: '0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa', color: '#00e676' },
@@ -235,12 +235,13 @@ const API = (() => {
       if (p.pairAddress) byPair.set(p.pairAddress.toLowerCase(), p);
     }
 
-    // Fetch live bars for ALL core coins from GeckoTerminal
-    // PLS pair (E56043) is WPLS/DAI — fetch without currency=usd and auto-invert
+    // Fetch live bars for ALL core coins from GeckoTerminal with currency=usd
+    // PLS uses chartPair (WPLS/USDC on PulseX) — WPLS is base token so currency=usd gives PLS price directly
+    // No inversion needed — all pairs return base-token price in USD
     const barResults = await Promise.allSettled(
       CORE_COINS.map(coin => {
-        const isPLS = coin.symbol === 'PLS';
-        return getChartBars(coin.pair, isPLS);
+        const pairForChart = coin.chartPair || coin.pair;
+        return getChartBars(pairForChart, false); // always use currency=usd, no inversion
       })
     );
 
