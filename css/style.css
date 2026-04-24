@@ -3194,3 +3194,146 @@ a.commodity-card:hover {
   opacity: 1;
 }
 
+
+
+/* ══════════════════════════════════════════════════════
+   COMMODITY CARDS — enhanced with Omkar API data
+   ══════════════════════════════════════════════════════ */
+
+/* Section header with live count badge */
+.commodity-section-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .75rem;
+  padding-bottom: .35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.commodity-live-badge {
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .18rem .5rem;
+  border-radius: 99px;
+  background: rgba(34,197,94,.15);
+  color: var(--green, #22c55e);
+  border: 1px solid rgba(34,197,94,.3);
+}
+
+/* Live card accent */
+.commodity-card--live {
+  border-color: var(--border-light);
+}
+
+.commodity-card--live:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+/* Price row: price + change pill side by side */
+.commodity-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .1rem;
+}
+
+/* Change pill */
+.commodity-change-pill {
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .2rem .55rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.commodity-change-pill.up {
+  background: rgba(34,197,94,.15);
+  color: var(--green, #22c55e);
+  border: 1px solid rgba(34,197,94,.3);
+}
+
+.commodity-change-pill.down {
+  background: rgba(239,68,68,.15);
+  color: var(--red, #ef4444);
+  border: 1px solid rgba(239,68,68,.3);
+}
+
+.commodity-change-pill.flat {
+  background: var(--bg-3);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+}
+
+/* Meta row: exchange + updated + source */
+.commodity-meta-row {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin-top: .35rem;
+}
+
+.commodity-exchange-badge {
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: .15rem .45rem;
+  border-radius: 4px;
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.commodity-updated {
+  font-size: .62rem;
+  color: var(--text-3);
+}
+
+.commodity-source-badge {
+  font-size: .58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .12rem .4rem;
+  border-radius: 4px;
+  background: rgba(34,197,94,.12);
+  color: var(--green, #22c55e);
+  border: 1px solid rgba(34,197,94,.25);
+}
+
+/* Commodity description line */
+.commodity-desc {
+  font-size: .64rem;
+  color: var(--text-3);
+  margin-top: .35rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Unavailable state */
+.commodity-price--unavailable {
+  font-size: .85rem;
+  color: var(--text-3);
+  margin: .3rem 0;
+}
+
+/* Unit label */
+.commodity-unit {
+  color: var(--text-3);
+  font-size: .62rem;
+  margin-left: .25rem;
+}
+
+/* Wider grid for new cards with more data */
+.commodity-grid {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important;
+}
+

@@ -18,7 +18,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://js.puter.com",
     "img-src 'self' data: blob: https://cdn.dexscreener.com https://dd.dexscreener.com https://dexscreener.com https://icons.llamao.fi https://scan.pulsechain.com https://libertyswap.finance https://9mm.pro https://app.piteas.io https://www.geckoterminal.com https://hex.com https://www.dextools.io https://www.google.com https://t2.gstatic.com https://coin-images.coingecko.com https://assets.coingecko.com https://pump.tires https://js.puter.com",
     "frame-src https://dexscreener.com https://pulsex.mypinata.cloud https://js.puter.com",
-    "connect-src 'self' https://rpc-pulsechain.g4mm4.io https://raw.githubusercontent.com https://js.puter.com https://api.puter.com",
+    "connect-src 'self' https://rpc-pulsechain.g4mm4.io https://raw.githubusercontent.com https://js.puter.com https://api.puter.com https://commodity-price-api.omkar.cloud",
     "object-src 'none'",
     "base-uri 'self'",
   ].join('; '));
@@ -565,151 +565,188 @@ app.get('/api/coingecko/markets', async (req, res) => {
   return res.status(502).json({ error: 'Market data unavailable. Try again shortly.' });
 });
 
-/* ── Alpha Vantage Commodities — hourly exact-hour cache ─── */
-// Functions: WTI, BRENT, NATURAL_GAS, COPPER, ALUMINUM, WHEAT, CORN, COTTON, SUGAR, COFFEE
-// Fetches once per hour at the exact hour mark, shared across all users
+/* ══════════════════════════════════════════════════════════
+   COMMODITIES — Omkar API (primary) + Alpha Vantage (fallback)
+   Omkar: https://commodity-price-api.omkar.cloud
+   Returns real-time CME/NYMEX/CBOT futures prices
+   ══════════════════════════════════════════════════════════ */
 
-const AV_KEY = 'YFAIAETGBN2H298Z';
+const OMKAR_KEY = 'ok_a972f52bdd32c985a73bb5c7b67f2157';
+const OMKAR_BASE = 'https://commodity-price-api.omkar.cloud';
+const AV_KEY = 'YFAIAETGBN2H298Z'; // Alpha Vantage fallback
 
-// Map our Yahoo-style frontend IDs to Alpha Vantage function names
-const AV_COMMODITY_MAP = [
-  { id: 'GC=F',  fn: null,          name: 'Gold',          unit: '/oz'    }, // No AV endpoint for Gold/Silver/Platinum — use CoinGecko tokens
-  { id: 'SI=F',  fn: null,          name: 'Silver',        unit: '/oz'    },
-  { id: 'PL=F',  fn: null,          name: 'Platinum',      unit: '/oz'    },
-  { id: 'CL=F',  fn: 'WTI',         name: 'WTI Crude',     unit: '/bbl'   },
-  { id: 'BZ=F',  fn: 'BRENT',       name: 'Brent Crude',   unit: '/bbl'   },
-  { id: 'NG=F',  fn: 'NATURAL_GAS', name: 'Natural Gas',   unit: '/MMBtu' },
-  { id: 'HG=F',  fn: 'COPPER',      name: 'Copper',        unit: '/lb'    },
-  { id: 'ZW=F',  fn: 'WHEAT',       name: 'Wheat',         unit: '/bu'    },
-  { id: 'ZC=F',  fn: 'CORN',        name: 'Corn',          unit: '/bu'    },
-  { id: 'CT=F',  fn: 'COTTON',      name: 'Cotton',        unit: '/lb'    },
-  { id: 'SB=F',  fn: 'SUGAR',       name: 'Sugar',         unit: '/lb'    },
-  { id: 'KC=F',  fn: 'COFFEE',      name: 'Coffee',        unit: '/lb'    },
+// Full mapping: internal ID → Omkar name, AV function, display metadata
+const COMMODITY_MAP = [
+  // Precious Metals
+  { id: 'GC=F',  omkar: 'gold',          fn: null,              name: 'Gold',           symbol: 'XAU',    unit: '/oz',    category: 'Metals',      color: '#FFD700' },
+  { id: 'SI=F',  omkar: 'silver',         fn: null,              name: 'Silver',         symbol: 'XAG',    unit: '/oz',    category: 'Metals',      color: '#C0C0C0' },
+  { id: 'PL=F',  omkar: 'platinum',       fn: null,              name: 'Platinum',       symbol: 'PLAT',   unit: '/oz',    category: 'Metals',      color: '#E5E4E2' },
+  { id: 'PA=F',  omkar: 'palladium',      fn: null,              name: 'Palladium',      symbol: 'PALL',   unit: '/oz',    category: 'Metals',      color: '#9D8E7E' },
+  { id: 'MGC=F', omkar: 'micro_gold',     fn: null,              name: 'Micro Gold',     symbol: 'mXAU',   unit: '/oz',    category: 'Metals',      color: '#E8C84A' },
+  // Industrial Metals
+  { id: 'HG=F',  omkar: 'copper',         fn: 'COPPER',          name: 'Copper',         symbol: 'COPPER', unit: '/lb',    category: 'Metals',      color: '#B87333' },
+  { id: 'ALI=F', omkar: 'aluminum',       fn: 'ALUMINUM',        name: 'Aluminum',       symbol: 'ALU',    unit: '/ton',   category: 'Metals',      color: '#848789' },
+  // Energy
+  { id: 'CL=F',  omkar: 'crude_oil',      fn: 'WTI',             name: 'WTI Crude Oil',  symbol: 'WTI',    unit: '/bbl',   category: 'Energy',      color: '#8B4513' },
+  { id: 'BZ=F',  omkar: 'brent_crude_oil',fn: 'BRENT',           name: 'Brent Crude',    symbol: 'BRENT',  unit: '/bbl',   category: 'Energy',      color: '#A0522D' },
+  { id: 'NG=F',  omkar: 'natural_gas',    fn: 'NATURAL_GAS',     name: 'Natural Gas',    symbol: 'NATGAS', unit: '/MMBtu', category: 'Energy',      color: '#FF8C00' },
+  { id: 'RB=F',  omkar: 'gasoline_rbob',  fn: null,              name: 'RBOB Gasoline',  symbol: 'GAS',    unit: '/gal',   category: 'Energy',      color: '#DC143C' },
+  { id: 'HO=F',  omkar: 'heating_oil',    fn: null,              name: 'Heating Oil',    symbol: 'HO',     unit: '/gal',   category: 'Energy',      color: '#8B0000' },
+  // Agriculture
+  { id: 'ZW=F',  omkar: 'wheat',          fn: 'WHEAT',           name: 'Wheat',          symbol: 'WHEAT',  unit: '/bu',    category: 'Agriculture', color: '#DAA520' },
+  { id: 'ZC=F',  omkar: 'corn',           fn: 'CORN',            name: 'Corn',           symbol: 'CORN',   unit: '/bu',    category: 'Agriculture', color: '#F4D03F' },
+  { id: 'ZS=F',  omkar: 'soybean',        fn: null,              name: 'Soybeans',       symbol: 'SOY',    unit: '/bu',    category: 'Agriculture', color: '#6B8E23' },
+  { id: 'ZL=F',  omkar: 'soybean_oil',    fn: null,              name: 'Soybean Oil',    symbol: 'SOYOIL', unit: '/lb',    category: 'Agriculture', color: '#9ACD32' },
+  { id: 'ZM=F',  omkar: 'soybean_meal',   fn: null,              name: 'Soybean Meal',   symbol: 'SOYMEAL',unit: '/ton',   category: 'Agriculture', color: '#8FBC8F' },
+  { id: 'ZO=F',  omkar: 'oat',            fn: null,              name: 'Oats',           symbol: 'OATS',   unit: '/bu',    category: 'Agriculture', color: '#D2B48C' },
+  { id: 'ZR=F',  omkar: 'rough_rice',     fn: null,              name: 'Rough Rice',     symbol: 'RICE',   unit: '/cwt',   category: 'Agriculture', color: '#F5DEB3' },
+  { id: 'CC=F',  omkar: 'cocoa',          fn: null,              name: 'Cocoa',          symbol: 'COCOA',  unit: '/t',     category: 'Agriculture', color: '#5C3317' },
+  { id: 'KC=F',  omkar: 'coffee',         fn: 'COFFEE',          name: 'Coffee',         symbol: 'COFFEE', unit: '/lb',    category: 'Agriculture', color: '#6F4E37' },
+  { id: 'CT=F',  omkar: 'cotton',         fn: 'COTTON',          name: 'Cotton',         symbol: 'COTTON', unit: '/lb',    category: 'Agriculture', color: '#F5F5DC' },
+  { id: 'SB=F',  omkar: 'sugar',          fn: 'SUGAR',           name: 'Sugar',          symbol: 'SUGAR',  unit: '/lb',    category: 'Agriculture', color: '#FF69B4' },
+  { id: 'OJ=F',  omkar: 'orange_juice',   fn: null,              name: 'Orange Juice',   symbol: 'OJ',     unit: '/lb',    category: 'Agriculture', color: '#FF8C00' },
+  { id: 'LBS=F', omkar: 'lumber',         fn: null,              name: 'Lumber',         symbol: 'LUMBER', unit: '/MBF',   category: 'Timber',      color: '#8B6914' },
+  // Livestock
+  { id: 'LE=F',  omkar: 'live_cattle',    fn: null,              name: 'Live Cattle',    symbol: 'CATTLE', unit: '/lb',    category: 'Livestock',   color: '#8B4513' },
+  { id: 'GF=F',  omkar: 'feeder_cattle',  fn: null,              name: 'Feeder Cattle',  symbol: 'FCAT',   unit: '/lb',    category: 'Livestock',   color: '#A0522D' },
+  { id: 'HE=F',  omkar: 'lean_hogs',      fn: null,              name: 'Lean Hogs',      symbol: 'HOGS',   unit: '/lb',    category: 'Livestock',   color: '#FFB6C1' },
+  { id: 'DC=F',  omkar: 'class_3_milk',   fn: null,              name: 'Class III Milk', symbol: 'MILK',   unit: '/cwt',   category: 'Livestock',   color: '#FFFACD' },
 ];
 
-// CoinGecko IDs for metals (no AV equivalent with free key)
-const METALS_CG_IDS = 'pax-gold,tether-gold,silvercoin,platinum';
-const METALS_CG_MAP = {
-  'pax-gold':    'GC=F',
-  'tether-gold': 'GC=F',
-  'silvercoin':  'SI=F',
-  'silver':      'SI=F',
-  'platinum':    'PL=F',
-};
+// Cache: 5 minutes (market hours move fast; respects 5000/month limit)
+let commodityCache  = null;
+let commodityFetchPromise = null;
+const COMMODITY_TTL = 5 * 60_000;
 
-let commodityHourlyCache = null;   // { data: {...}, hourKey: 'YYYY-MM-DDTHH' }
-let commodityFetchPromise = null;  // deduplicate concurrent requests
-
-function getHourKey() {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}T${String(d.getUTCHours()).padStart(2,'0')}`;
+async function fetchOmkarCommodity(omkarName) {
+  const url = `${OMKAR_BASE}/commodity-price?name=${encodeURIComponent(omkarName)}`;
+  const r = await fetch(url, {
+    headers: { 'API-Key': OMKAR_KEY, 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (r.status === 429) throw new Error('Omkar rate limit');
+  if (r.status === 401) throw new Error('Omkar auth failed');
+  if (!r.ok) throw new Error(`Omkar HTTP ${r.status}`);
+  return r.json();
 }
 
-async function fetchAlphaVantageAll() {
+async function fetchAlphaVantageItem(fn) {
+  const url = `https://www.alphavantage.co/query?function=${fn}&interval=daily&apikey=${AV_KEY}`;
+  const r = await fetch(url, {
+    headers: { 'User-Agent': 'PulseCentral/1.0' },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new Error(`AV HTTP ${r.status}`);
+  const data = await r.json();
+  const series = data?.data;
+  if (!Array.isArray(series) || series.length < 2) throw new Error('AV no data');
+  const latest = series.find(d => d.value && d.value !== '.' && d.value !== 'null');
+  const prev   = series.slice(1).find(d => d.value && d.value !== '.' && d.value !== 'null');
+  if (!latest) throw new Error('AV no valid latest');
+  return {
+    price_usd:   parseFloat(latest.value),
+    prev_price:  prev ? parseFloat(prev.value) : parseFloat(latest.value),
+    updated_at:  latest.date,
+    exchange:    'CME',
+    source:      'AlphaVantage',
+  };
+}
+
+async function fetchAllCommodities() {
   const result = {};
-  const avItems = AV_COMMODITY_MAP.filter(c => c.fn);
 
-  // Rate limit: free AV key = 25 calls/day, 500/month. Fetch 9 commodities.
-  // Sequential with small delay to be safe
-  for (const item of avItems) {
-    try {
-      const url = `https://www.alphavantage.co/query?function=${item.fn}&interval=daily&apikey=${AV_KEY}`;
-      const r = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)' },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!r.ok) { console.warn(`[AV] ${item.fn} HTTP ${r.status}`); continue; }
-      const data = await r.json();
+  // Fire all Omkar fetches in parallel (rate: ~28 items, well within 5000/month)
+  const omkarItems = COMMODITY_MAP.filter(c => c.omkar);
+  const omkarResults = await Promise.allSettled(
+    omkarItems.map(item => fetchOmkarCommodity(item.omkar).then(d => ({ item, d })))
+  );
 
-      // AV returns: { "name": "...", "data": [ { "date": "YYYY-MM-DD", "value": "XX.XX" }, ... ] }
-      const series = data?.data;
-      if (!Array.isArray(series) || series.length < 2) {
-        console.warn(`[AV] ${item.fn} no data:`, JSON.stringify(data).slice(0, 100)); continue;
-      }
+  for (const r of omkarResults) {
+    if (r.status === 'rejected') {
+      console.warn(`[omkar] ${r.reason?.message}`);
+      continue;
+    }
+    const { item, d } = r.value;
+    if (!d || d.price_usd == null) continue;
 
-      // Latest non-null value
-      const latest = series.find(d => d.value && d.value !== '.' && d.value !== 'null');
-      const prev   = series.slice(1).find(d => d.value && d.value !== '.' && d.value !== 'null');
-      if (!latest) { console.warn(`[AV] ${item.fn} no valid latest`); continue; }
+    result[item.id] = {
+      price:      d.price_usd,
+      prevClose:  d.price_usd, // Omkar doesn't return prev close — will compute change below
+      change:     0,
+      changePct:  0,
+      exchange:   d.exchange || 'CME',
+      updatedAt:  d.updated_at,
+      source:     'Omkar',
+      omkarName:  item.omkar,
+    };
+  }
 
-      const price    = parseFloat(latest.value);
-      const prevVal  = prev ? parseFloat(prev.value) : price;
-      const change   = price - prevVal;
-      const changePct= prevVal ? (change / prevVal) * 100 : 0;
-
-      result[item.id] = { price, prevClose: prevVal, change, changePct, lastUpdate: Date.now(), source: 'AlphaVantage', date: latest.date };
-      console.log(`[AV] ${item.fn}: $${price} (${latest.date})`);
-
-      // Small delay between calls to respect rate limits
-      await new Promise(res => setTimeout(res, 200));
-    } catch (e) {
-      console.warn(`[AV] ${item.fn} error:`, e.message);
+  // For items that Omkar returned, use AV as prev-close source to compute % change
+  // (run in parallel, best-effort — won't block main results)
+  const avItems = COMMODITY_MAP.filter(c => c.fn && result[c.id]);
+  const avResults = await Promise.allSettled(
+    avItems.map(item => fetchAlphaVantageItem(item.fn).then(d => ({ item, d })))
+  );
+  for (const r of avResults) {
+    if (r.status === 'rejected') continue;
+    const { item, d } = r.value;
+    const entry = result[item.id];
+    if (!entry || !d) continue;
+    const prev = d.prev_price;
+    if (prev && prev > 0) {
+      entry.prevClose = prev;
+      entry.change    = entry.price - prev;
+      entry.changePct = ((entry.price - prev) / prev) * 100;
     }
   }
 
-  // Metals from CoinGecko (no AV equivalent on free tier)
-  try {
-    const cgUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${METALS_CG_IDS}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`;
-    const cgR = await fetch(cgUrl, { headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12_000) });
-    if (cgR.ok) {
-      const coins = await cgR.json();
-      if (Array.isArray(coins)) {
-        for (const coin of coins) {
-          const sym = METALS_CG_MAP[coin.id];
-          if (!sym || result[sym]) continue;
-          result[sym] = {
-            price:     coin.current_price || 0,
-            prevClose: (coin.current_price || 0) - (coin.price_change_24h || 0),
-            change:    coin.price_change_24h || 0,
-            changePct: coin.price_change_percentage_24h || 0,
-            lastUpdate: Date.now(),
-            source: 'CoinGecko',
-            image:  coin.image || null,
-          };
-        }
-      }
-    }
-  } catch (e) { console.warn('[commodities] CoinGecko metals error:', e.message); }
+  // Fallback for any item Omkar missed — try AV directly
+  const missed = COMMODITY_MAP.filter(c => c.fn && !result[c.id]);
+  const avFallbackResults = await Promise.allSettled(
+    missed.map(item => fetchAlphaVantageItem(item.fn).then(d => ({ item, d })))
+  );
+  for (const r of avFallbackResults) {
+    if (r.status === 'rejected') continue;
+    const { item, d } = r.value;
+    if (!d) continue;
+    result[item.id] = {
+      price:      d.price_usd,
+      prevClose:  d.prev_price,
+      change:     d.price_usd - d.prev_price,
+      changePct:  d.prev_price ? ((d.price_usd - d.prev_price) / d.prev_price) * 100 : 0,
+      exchange:   d.exchange,
+      updatedAt:  d.updated_at,
+      source:     'AlphaVantage',
+    };
+  }
 
-  console.log(`[commodities] hourly fetch complete: ${Object.keys(result).length} symbols`);
+  console.log(`[commodities] fetched ${Object.keys(result).length}/${COMMODITY_MAP.length} symbols (${Object.values(result).filter(v=>v.source==='Omkar').length} Omkar, ${Object.values(result).filter(v=>v.source==='AlphaVantage').length} AV)`);
   return result;
 }
 
 async function getCommodityData() {
-  const hourKey = getHourKey();
-
-  // Return cached if still same hour
-  if (commodityHourlyCache && commodityHourlyCache.hourKey === hourKey) {
-    return commodityHourlyCache.data;
+  if (commodityCache && (Date.now() - commodityCache.ts < COMMODITY_TTL)) {
+    return commodityCache.data;
   }
-
-  // Deduplicate concurrent fetches
   if (commodityFetchPromise) return commodityFetchPromise;
 
-  commodityFetchPromise = fetchAlphaVantageAll().then(data => {
-    commodityHourlyCache = { data, hourKey };
+  commodityFetchPromise = fetchAllCommodities().then(data => {
+    commodityCache = { data, ts: Date.now() };
     commodityFetchPromise = null;
     return data;
   }).catch(e => {
     commodityFetchPromise = null;
     console.error('[commodities] fetch failed:', e.message);
-    return commodityHourlyCache?.data || {};
+    return commodityCache?.data || {};
   });
 
   return commodityFetchPromise;
 }
 
-// Pre-warm at server start and then at the top of every hour
-setTimeout(() => getCommodityData(), 5000);
-function scheduleNextHour() {
-  const now = new Date();
-  const msToNextHour = (60 - now.getUTCMinutes()) * 60_000 - now.getUTCSeconds() * 1000 - now.getUTCMilliseconds();
-  setTimeout(() => {
-    getCommodityData();
-    setInterval(() => getCommodityData(), 3_600_000); // every hour
-  }, msToNextHour);
-}
-scheduleNextHour();
+// Pre-warm on server start
+setTimeout(() => getCommodityData().catch(e => console.warn('[commodities] warm-up:', e.message)), 4000);
+// Refresh every 5 minutes
+setInterval(() => getCommodityData().catch(e => console.warn('[commodities] refresh:', e.message)), COMMODITY_TTL);
 
 app.get('/api/commodities', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -720,6 +757,21 @@ app.get('/api/commodities', async (req, res) => {
     res.status(502).json({ error: e.message });
   }
 });
+
+// Single commodity lookup (for on-demand refresh of one symbol)
+app.get('/api/commodities/:symbol', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const sym  = req.params.symbol;
+  const item = COMMODITY_MAP.find(c => c.id === sym || c.omkar === sym);
+  if (!item) return res.status(404).json({ error: 'Unknown symbol' });
+  try {
+    const d = await fetchOmkarCommodity(item.omkar);
+    res.json(d);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 
 /* ── Weekly chart snapshot (served from disk cache) ───── */
 // Server pre-builds weekly OHLCV snapshots using GeckoTerminal
