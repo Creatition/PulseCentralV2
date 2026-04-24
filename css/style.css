@@ -220,16 +220,37 @@ input, select, textarea { font-family: var(--font); }
 .logo {
   display: flex;
   align-items: center;
-  gap: .5rem;
+  gap: .55rem;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
   text-decoration: none;
+  transition: opacity .2s;
 }
-.logo-icon { width: 28px; height: 28px; }
-.logo span.pulse { color: var(--primary); }
-.logo span.central { color: var(--text); }
+.logo:hover { opacity: .88; }
+.logo:hover .logo-icon { filter: drop-shadow(0 0 8px rgba(123,47,255,.6)); }
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  transition: filter .25s, transform .25s;
+  flex-shrink: 0;
+}
+.logo:hover .logo-icon { transform: scale(1.06); }
+.logo-wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  letter-spacing: -.01em;
+}
+.logo span.pulse {
+  background: linear-gradient(135deg, #1e90ff 0%, #7b2fff 50%, #ff2f7b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+.logo span.central { color: var(--text); font-weight: 600; }
 
 /* Tab nav */
 .tab-nav {
