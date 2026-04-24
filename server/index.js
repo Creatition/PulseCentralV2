@@ -676,156 +676,175 @@ app.get('/api/coingecko/markets', async (req, res) => {
    Returns real-time CME/NYMEX/CBOT futures prices
    ══════════════════════════════════════════════════════════ */
 
-const OMKAR_KEY = 'ok_a972f52bdd32c985a73bb5c7b67f2157';
-const OMKAR_BASE = 'https://commodity-price-api.omkar.cloud';
-const AV_KEY = 'YFAIAETGBN2H298Z'; // Alpha Vantage fallback
+/* ══════════════════════════════════════════════════════════
+   COMMODITY MAP — Yahoo Finance ticker → display metadata
+   Yahoo Finance serves real-time CME/NYMEX/CBOT futures
+   prices for all standard futures symbols (GC=F, CL=F, etc.)
+   No API key required. Stooq.com used as fallback.
+   ══════════════════════════════════════════════════════════ */
 
-// Full mapping: internal ID → Omkar name, AV function, display metadata
 const COMMODITY_MAP = [
   // Precious Metals
-  { id: 'GC=F',  omkar: 'gold',          fn: null,              name: 'Gold',           symbol: 'XAU',    unit: '/oz',    category: 'Metals',      color: '#FFD700' },
-  { id: 'SI=F',  omkar: 'silver',         fn: null,              name: 'Silver',         symbol: 'XAG',    unit: '/oz',    category: 'Metals',      color: '#C0C0C0' },
-  { id: 'PL=F',  omkar: 'platinum',       fn: null,              name: 'Platinum',       symbol: 'PLAT',   unit: '/oz',    category: 'Metals',      color: '#E5E4E2' },
-  { id: 'PA=F',  omkar: 'palladium',      fn: null,              name: 'Palladium',      symbol: 'PALL',   unit: '/oz',    category: 'Metals',      color: '#9D8E7E' },
-  { id: 'MGC=F', omkar: 'micro_gold',     fn: null,              name: 'Micro Gold',     symbol: 'mXAU',   unit: '/oz',    category: 'Metals',      color: '#E8C84A' },
+  { id: 'GC=F',  stooq: 'gc.f',  name: 'Gold',           symbol: 'XAU',    unit: '/oz',    category: 'Metals',      color: '#FFD700' },
+  { id: 'SI=F',  stooq: 'si.f',  name: 'Silver',         symbol: 'XAG',    unit: '/oz',    category: 'Metals',      color: '#C0C0C0' },
+  { id: 'PL=F',  stooq: 'pl.f',  name: 'Platinum',       symbol: 'PLAT',   unit: '/oz',    category: 'Metals',      color: '#E5E4E2' },
+  { id: 'PA=F',  stooq: 'pa.f',  name: 'Palladium',      symbol: 'PALL',   unit: '/oz',    category: 'Metals',      color: '#9D8E7E' },
   // Industrial Metals
-  { id: 'HG=F',  omkar: 'copper',         fn: 'COPPER',          name: 'Copper',         symbol: 'COPPER', unit: '/lb',    category: 'Metals',      color: '#B87333' },
-  { id: 'ALI=F', omkar: 'aluminum',       fn: 'ALUMINUM',        name: 'Aluminum',       symbol: 'ALU',    unit: '/ton',   category: 'Metals',      color: '#848789' },
+  { id: 'HG=F',  stooq: 'hg.f',  name: 'Copper',         symbol: 'COPPER', unit: '/lb',    category: 'Metals',      color: '#B87333' },
+  { id: 'ALI=F', stooq: null,    name: 'Aluminum',       symbol: 'ALU',    unit: '/ton',   category: 'Metals',      color: '#848789' },
   // Energy
-  { id: 'CL=F',  omkar: 'crude_oil',      fn: 'WTI',             name: 'WTI Crude Oil',  symbol: 'WTI',    unit: '/bbl',   category: 'Energy',      color: '#8B4513' },
-  { id: 'BZ=F',  omkar: 'brent_crude_oil',fn: 'BRENT',           name: 'Brent Crude',    symbol: 'BRENT',  unit: '/bbl',   category: 'Energy',      color: '#A0522D' },
-  { id: 'NG=F',  omkar: 'natural_gas',    fn: 'NATURAL_GAS',     name: 'Natural Gas',    symbol: 'NATGAS', unit: '/MMBtu', category: 'Energy',      color: '#FF8C00' },
-  { id: 'RB=F',  omkar: 'gasoline_rbob',  fn: null,              name: 'RBOB Gasoline',  symbol: 'GAS',    unit: '/gal',   category: 'Energy',      color: '#DC143C' },
-  { id: 'HO=F',  omkar: 'heating_oil',    fn: null,              name: 'Heating Oil',    symbol: 'HO',     unit: '/gal',   category: 'Energy',      color: '#8B0000' },
+  { id: 'CL=F',  stooq: 'cl.f',  name: 'WTI Crude Oil',  symbol: 'WTI',    unit: '/bbl',   category: 'Energy',      color: '#8B4513' },
+  { id: 'BZ=F',  stooq: 'bz.f',  name: 'Brent Crude',    symbol: 'BRENT',  unit: '/bbl',   category: 'Energy',      color: '#A0522D' },
+  { id: 'NG=F',  stooq: 'ng.f',  name: 'Natural Gas',    symbol: 'NATGAS', unit: '/MMBtu', category: 'Energy',      color: '#FF8C00' },
+  { id: 'RB=F',  stooq: 'rb.f',  name: 'RBOB Gasoline',  symbol: 'GAS',    unit: '/gal',   category: 'Energy',      color: '#DC143C' },
+  { id: 'HO=F',  stooq: 'ho.f',  name: 'Heating Oil',    symbol: 'HO',     unit: '/gal',   category: 'Energy',      color: '#8B0000' },
   // Agriculture
-  { id: 'ZW=F',  omkar: 'wheat',          fn: 'WHEAT',           name: 'Wheat',          symbol: 'WHEAT',  unit: '/bu',    category: 'Agriculture', color: '#DAA520' },
-  { id: 'ZC=F',  omkar: 'corn',           fn: 'CORN',            name: 'Corn',           symbol: 'CORN',   unit: '/bu',    category: 'Agriculture', color: '#F4D03F' },
-  { id: 'ZS=F',  omkar: 'soybean',        fn: null,              name: 'Soybeans',       symbol: 'SOY',    unit: '/bu',    category: 'Agriculture', color: '#6B8E23' },
-  { id: 'ZL=F',  omkar: 'soybean_oil',    fn: null,              name: 'Soybean Oil',    symbol: 'SOYOIL', unit: '/lb',    category: 'Agriculture', color: '#9ACD32' },
-  { id: 'ZM=F',  omkar: 'soybean_meal',   fn: null,              name: 'Soybean Meal',   symbol: 'SOYMEAL',unit: '/ton',   category: 'Agriculture', color: '#8FBC8F' },
-  { id: 'ZO=F',  omkar: 'oat',            fn: null,              name: 'Oats',           symbol: 'OATS',   unit: '/bu',    category: 'Agriculture', color: '#D2B48C' },
-  { id: 'ZR=F',  omkar: 'rough_rice',     fn: null,              name: 'Rough Rice',     symbol: 'RICE',   unit: '/cwt',   category: 'Agriculture', color: '#F5DEB3' },
-  { id: 'CC=F',  omkar: 'cocoa',          fn: null,              name: 'Cocoa',          symbol: 'COCOA',  unit: '/t',     category: 'Agriculture', color: '#5C3317' },
-  { id: 'KC=F',  omkar: 'coffee',         fn: 'COFFEE',          name: 'Coffee',         symbol: 'COFFEE', unit: '/lb',    category: 'Agriculture', color: '#6F4E37' },
-  { id: 'CT=F',  omkar: 'cotton',         fn: 'COTTON',          name: 'Cotton',         symbol: 'COTTON', unit: '/lb',    category: 'Agriculture', color: '#F5F5DC' },
-  { id: 'SB=F',  omkar: 'sugar',          fn: 'SUGAR',           name: 'Sugar',          symbol: 'SUGAR',  unit: '/lb',    category: 'Agriculture', color: '#FF69B4' },
-  { id: 'OJ=F',  omkar: 'orange_juice',   fn: null,              name: 'Orange Juice',   symbol: 'OJ',     unit: '/lb',    category: 'Agriculture', color: '#FF8C00' },
-  { id: 'LBS=F', omkar: 'lumber',         fn: null,              name: 'Lumber',         symbol: 'LUMBER', unit: '/MBF',   category: 'Timber',      color: '#8B6914' },
+  { id: 'ZW=F',  stooq: 'zw.f',  name: 'Wheat',          symbol: 'WHEAT',  unit: '/bu',    category: 'Agriculture', color: '#DAA520' },
+  { id: 'ZC=F',  stooq: 'zc.f',  name: 'Corn',           symbol: 'CORN',   unit: '/bu',    category: 'Agriculture', color: '#F4D03F' },
+  { id: 'ZS=F',  stooq: 'zs.f',  name: 'Soybeans',       symbol: 'SOY',    unit: '/bu',    category: 'Agriculture', color: '#6B8E23' },
+  { id: 'ZL=F',  stooq: 'zl.f',  name: 'Soybean Oil',    symbol: 'SOYOIL', unit: '/lb',    category: 'Agriculture', color: '#9ACD32' },
+  { id: 'ZM=F',  stooq: 'zm.f',  name: 'Soybean Meal',   symbol: 'SOYMEAL',unit: '/ton',   category: 'Agriculture', color: '#8FBC8F' },
+  { id: 'ZO=F',  stooq: 'zo.f',  name: 'Oats',           symbol: 'OATS',   unit: '/bu',    category: 'Agriculture', color: '#D2B48C' },
+  { id: 'CC=F',  stooq: 'cc.f',  name: 'Cocoa',          symbol: 'COCOA',  unit: '/t',     category: 'Agriculture', color: '#5C3317' },
+  { id: 'KC=F',  stooq: 'kc.f',  name: 'Coffee',         symbol: 'COFFEE', unit: '/lb',    category: 'Agriculture', color: '#6F4E37' },
+  { id: 'CT=F',  stooq: 'ct.f',  name: 'Cotton',         symbol: 'COTTON', unit: '/lb',    category: 'Agriculture', color: '#F5F5DC' },
+  { id: 'SB=F',  stooq: 'sb.f',  name: 'Sugar',          symbol: 'SUGAR',  unit: '/lb',    category: 'Agriculture', color: '#FF69B4' },
+  { id: 'OJ=F',  stooq: null,    name: 'Orange Juice',   symbol: 'OJ',     unit: '/lb',    category: 'Agriculture', color: '#FF8C00' },
   // Livestock
-  { id: 'LE=F',  omkar: 'live_cattle',    fn: null,              name: 'Live Cattle',    symbol: 'CATTLE', unit: '/lb',    category: 'Livestock',   color: '#8B4513' },
-  { id: 'GF=F',  omkar: 'feeder_cattle',  fn: null,              name: 'Feeder Cattle',  symbol: 'FCAT',   unit: '/lb',    category: 'Livestock',   color: '#A0522D' },
-  { id: 'HE=F',  omkar: 'lean_hogs',      fn: null,              name: 'Lean Hogs',      symbol: 'HOGS',   unit: '/lb',    category: 'Livestock',   color: '#FFB6C1' },
-  { id: 'DC=F',  omkar: 'class_3_milk',   fn: null,              name: 'Class III Milk', symbol: 'MILK',   unit: '/cwt',   category: 'Livestock',   color: '#FFFACD' },
+  { id: 'LE=F',  stooq: 'le.f',  name: 'Live Cattle',    symbol: 'CATTLE', unit: '/lb',    category: 'Livestock',   color: '#8B4513' },
+  { id: 'GF=F',  stooq: 'gf.f',  name: 'Feeder Cattle',  symbol: 'FCAT',   unit: '/lb',    category: 'Livestock',   color: '#A0522D' },
+  { id: 'HE=F',  stooq: 'he.f',  name: 'Lean Hogs',      symbol: 'HOGS',   unit: '/lb',    category: 'Livestock',   color: '#FFB6C1' },
+  // Timber
+  { id: 'LBS=F', stooq: null,    name: 'Lumber',         symbol: 'LUMBER', unit: '/MBF',   category: 'Timber',      color: '#8B6914' },
 ];
 
-// Cache: 5 minutes (market hours move fast; respects 5000/month limit)
-let commodityCache  = null;
+// Cache: 5 minutes
+let commodityCache        = null;
 let commodityFetchPromise = null;
-const COMMODITY_TTL = 5 * 60_000;
+const COMMODITY_TTL       = 5 * 60_000;
 
-async function fetchOmkarCommodity(omkarName) {
-  const url = `${OMKAR_BASE}/commodity-price?name=${encodeURIComponent(omkarName)}`;
+/* ── Source 1: Yahoo Finance (primary, no key needed) ──────
+   Batches all symbols in one request to v8/finance/quote.
+   Returns regularMarketPrice, regularMarketPreviousClose,
+   regularMarketChangePercent, regularMarketChange.
+   ─────────────────────────────────────────────────────────── */
+async function fetchYahooFinanceBatch(symbols) {
+  const joined = symbols.map(s => encodeURIComponent(s)).join('%2C');
+  const url = `https://query1.finance.yahoo.com/v8/finance/quote?symbols=${joined}&fields=regularMarketPrice,regularMarketPreviousClose,regularMarketChange,regularMarketChangePercent,regularMarketTime,shortName,currency`;
   const r = await fetch(url, {
-    headers: { 'API-Key': OMKAR_KEY, 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
-    signal: AbortSignal.timeout(12_000),
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': 'https://finance.yahoo.com/',
+    },
+    signal: AbortSignal.timeout(18_000),
   });
-  if (r.status === 429) throw new Error('Omkar rate limit');
-  if (r.status === 401) throw new Error('Omkar auth failed');
-  if (!r.ok) throw new Error(`Omkar HTTP ${r.status}`);
-  return r.json();
+  if (!r.ok) throw new Error(`Yahoo HTTP ${r.status}`);
+  const data = await r.json();
+  const quotes = data?.quoteResponse?.result || [];
+  const map = new Map();
+  for (const q of quotes) {
+    const price = q.regularMarketPrice;
+    const prev  = q.regularMarketPreviousClose;
+    if (price == null) continue;
+    map.set(q.symbol, {
+      price:      price,
+      prevClose:  prev ?? price,
+      change:     q.regularMarketChange     ?? (prev ? price - prev : 0),
+      changePct:  q.regularMarketChangePercent ?? (prev && prev > 0 ? ((price - prev) / prev) * 100 : 0),
+      exchange:   'CME',
+      updatedAt:  q.regularMarketTime ? new Date(q.regularMarketTime * 1000).toISOString() : new Date().toISOString(),
+      source:     'Yahoo',
+      currency:   q.currency || 'USD',
+      shortName:  q.shortName || null,
+    });
+  }
+  return map;
 }
 
-async function fetchAlphaVantageItem(fn) {
-  const url = `https://www.alphavantage.co/query?function=${fn}&interval=daily&apikey=${AV_KEY}`;
+/* ── Source 2: Stooq (fallback for any Yahoo misses) ───────
+   CSV endpoint: https://stooq.com/q/l/?s=gc.f&f=sd2t2ohlcv&h&e=csv
+   Returns: Symbol,Date,Time,Open,High,Low,Close,Volume
+   ─────────────────────────────────────────────────────────── */
+async function fetchStooqQuote(stooqSymbol) {
+  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSymbol)}&f=sd2ohlcv&h&e=csv`;
   const r = await fetch(url, {
-    headers: { 'User-Agent': 'PulseCentral/1.0' },
-    signal: AbortSignal.timeout(15_000),
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'text/csv,text/plain,*/*' },
+    signal: AbortSignal.timeout(12_000),
   });
-  if (!r.ok) throw new Error(`AV HTTP ${r.status}`);
-  const data = await r.json();
-  const series = data?.data;
-  if (!Array.isArray(series) || series.length < 2) throw new Error('AV no data');
-  const latest = series.find(d => d.value && d.value !== '.' && d.value !== 'null');
-  const prev   = series.slice(1).find(d => d.value && d.value !== '.' && d.value !== 'null');
-  if (!latest) throw new Error('AV no valid latest');
+  if (!r.ok) throw new Error(`Stooq HTTP ${r.status}`);
+  const text = await r.text();
+  // CSV: Symbol,Date,Open,High,Low,Close,Volume
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) throw new Error('Stooq: no data rows');
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const vals    = lines[1].split(',').map(v => v.trim());
+  const row = {};
+  headers.forEach((h, i) => { row[h] = vals[i]; });
+  const close = parseFloat(row['close'] || row['last'] || 0);
+  const open  = parseFloat(row['open']  || close);
+  if (!close || close <= 0) throw new Error('Stooq: zero price');
   return {
-    price_usd:   parseFloat(latest.value),
-    prev_price:  prev ? parseFloat(prev.value) : parseFloat(latest.value),
-    updated_at:  latest.date,
-    exchange:    'CME',
-    source:      'AlphaVantage',
+    price:     close,
+    prevClose: open,
+    change:    close - open,
+    changePct: open > 0 ? ((close - open) / open) * 100 : 0,
+    exchange:  'CME',
+    updatedAt: row['date'] ? new Date(row['date']).toISOString() : new Date().toISOString(),
+    source:    'Stooq',
   };
 }
 
+/* ── Main fetch: Yahoo batch → Stooq fallback per missed item ── */
 async function fetchAllCommodities() {
   const result = {};
+  const allSymbols = COMMODITY_MAP.map(c => c.id);
 
-  // Fire all Omkar fetches in parallel (rate: ~28 items, well within 5000/month)
-  const omkarItems = COMMODITY_MAP.filter(c => c.omkar);
-  const omkarResults = await Promise.allSettled(
-    omkarItems.map(item => fetchOmkarCommodity(item.omkar).then(d => ({ item, d })))
-  );
-
-  for (const r of omkarResults) {
-    if (r.status === 'rejected') {
-      console.warn(`[omkar] ${r.reason?.message}`);
-      continue;
-    }
-    const { item, d } = r.value;
-    if (!d || d.price_usd == null) continue;
-
-    result[item.id] = {
-      price:      d.price_usd,
-      prevClose:  d.price_usd, // Omkar doesn't return prev close — will compute change below
-      change:     0,
-      changePct:  0,
-      exchange:   d.exchange || 'CME',
-      updatedAt:  d.updated_at,
-      source:     'Omkar',
-      omkarName:  item.omkar,
-    };
+  // Stage 1: Yahoo Finance batch (all symbols in one call)
+  let yahooMap = new Map();
+  try {
+    yahooMap = await fetchYahooFinanceBatch(allSymbols);
+    console.log(`[commodities/yahoo] got ${yahooMap.size}/${allSymbols.length} quotes`);
+  } catch (e) {
+    console.warn('[commodities/yahoo] batch failed:', e.message);
+    // Try splitting into smaller batches of 10 if the full batch failed
+    const chunks = [];
+    for (let i = 0; i < allSymbols.length; i += 10) chunks.push(allSymbols.slice(i, i + 10));
+    await Promise.allSettled(chunks.map(async chunk => {
+      try {
+        const m = await fetchYahooFinanceBatch(chunk);
+        for (const [k, v] of m) yahooMap.set(k, v);
+      } catch (e2) { console.warn('[commodities/yahoo] chunk failed:', e2.message); }
+    }));
+    console.log(`[commodities/yahoo] chunked got ${yahooMap.size}/${allSymbols.length}`);
   }
 
-  // For items that Omkar returned, use AV as prev-close source to compute % change
-  // (run in parallel, best-effort — won't block main results)
-  const avItems = COMMODITY_MAP.filter(c => c.fn && result[c.id]);
-  const avResults = await Promise.allSettled(
-    avItems.map(item => fetchAlphaVantageItem(item.fn).then(d => ({ item, d })))
-  );
-  for (const r of avResults) {
-    if (r.status === 'rejected') continue;
-    const { item, d } = r.value;
-    const entry = result[item.id];
-    if (!entry || !d) continue;
-    const prev = d.prev_price;
-    if (prev && prev > 0) {
-      entry.prevClose = prev;
-      entry.change    = entry.price - prev;
-      entry.changePct = ((entry.price - prev) / prev) * 100;
+  for (const item of COMMODITY_MAP) {
+    if (yahooMap.has(item.id)) result[item.id] = yahooMap.get(item.id);
+  }
+
+  // Stage 2: Stooq fallback for any Yahoo misses
+  const missed = COMMODITY_MAP.filter(c => !result[c.id] && c.stooq);
+  if (missed.length > 0) {
+    console.log(`[commodities/stooq] fetching ${missed.length} missed symbols via Stooq`);
+    const stooqResults = await Promise.allSettled(
+      missed.map(item => fetchStooqQuote(item.stooq).then(d => ({ item, d })))
+    );
+    for (const r of stooqResults) {
+      if (r.status === 'rejected') {
+        console.warn('[commodities/stooq]', r.reason?.message);
+        continue;
+      }
+      const { item, d } = r.value;
+      if (d && d.price > 0) result[item.id] = d;
     }
   }
 
-  // Fallback for any item Omkar missed — try AV directly
-  const missed = COMMODITY_MAP.filter(c => c.fn && !result[c.id]);
-  const avFallbackResults = await Promise.allSettled(
-    missed.map(item => fetchAlphaVantageItem(item.fn).then(d => ({ item, d })))
-  );
-  for (const r of avFallbackResults) {
-    if (r.status === 'rejected') continue;
-    const { item, d } = r.value;
-    if (!d) continue;
-    result[item.id] = {
-      price:      d.price_usd,
-      prevClose:  d.prev_price,
-      change:     d.price_usd - d.prev_price,
-      changePct:  d.prev_price ? ((d.price_usd - d.prev_price) / d.prev_price) * 100 : 0,
-      exchange:   d.exchange,
-      updatedAt:  d.updated_at,
-      source:     'AlphaVantage',
-    };
-  }
-
-  console.log(`[commodities] fetched ${Object.keys(result).length}/${COMMODITY_MAP.length} symbols (${Object.values(result).filter(v=>v.source==='Omkar').length} Omkar, ${Object.values(result).filter(v=>v.source==='AlphaVantage').length} AV)`);
+  const total   = Object.keys(result).length;
+  const yahoo   = Object.values(result).filter(v => v.source === 'Yahoo').length;
+  const stooq   = Object.values(result).filter(v => v.source === 'Stooq').length;
+  console.log(`[commodities] ${total}/${COMMODITY_MAP.length} resolved (${yahoo} Yahoo, ${stooq} Stooq)`);
   return result;
 }
 
@@ -863,15 +882,20 @@ app.get('/api/commodities', async (req, res) => {
   }
 });
 
-// Single commodity lookup (for on-demand refresh of one symbol)
+// Single commodity lookup (on-demand refresh of one symbol)
 app.get('/api/commodities/:symbol', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   const sym  = req.params.symbol;
-  const item = COMMODITY_MAP.find(c => c.id === sym || c.omkar === sym);
+  const item = COMMODITY_MAP.find(c => c.id === sym || c.symbol === sym);
   if (!item) return res.status(404).json({ error: 'Unknown symbol' });
   try {
-    const d = await fetchOmkarCommodity(item.omkar);
-    res.json(d);
+    const map = await fetchYahooFinanceBatch([item.id]);
+    if (map.has(item.id)) return res.json(map.get(item.id));
+    if (item.stooq) {
+      const d = await fetchStooqQuote(item.stooq);
+      return res.json(d);
+    }
+    res.status(502).json({ error: 'No data available' });
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
