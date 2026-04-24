@@ -55,10 +55,10 @@ setInterval(() => { const n = Date.now(); for (const [k, v] of rlMap) if (n >= v
 const cache = new Map();
 const TTL   = 30_000;
 
-function getCached(k) {
+function getCached(k, ttl = TTL) {
   const e = cache.get(k);
   if (!e) return null;
-  if (Date.now() - e.t > TTL) { cache.delete(k); return null; }
+  if (Date.now() - e.t > ttl) { cache.delete(k); return null; }
   return e.d;
 }
 function setCached(k, d) { cache.set(k, { d, t: Date.now() }); }
@@ -249,6 +249,27 @@ app.get('/api/moralis/token-prices', async (req, res) => {
   } catch (e) {
     console.error('[moralis/token-prices]', e.message);
     res.status(502).json({ error: e.message });
+  }
+});
+
+// Single token price lookup — fallback when batch /erc20/prices misses a token
+app.get('/api/moralis/token-price/:address', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const addr = sanitise(req.params.address);
+  if (!addr || !/^0x[0-9a-f]{40}$/i.test(addr)) return res.status(400).json({ error: 'Invalid address' });
+  const cacheKey = `moralis-token-price-${addr}`;
+  const cached = getCached(cacheKey, 60_000);
+  if (cached) return res.json(cached);
+  try {
+    const data = await moralisFetch(`/erc20/${addr}/price`, {
+      chain:   PULSECHAIN_ID,
+      include: 'percent_change',
+    });
+    setCached(cacheKey, data);
+    res.json(data);
+  } catch (e) {
+    // Return empty object rather than 502 — client treats missing as no-data
+    res.json({});
   }
 });
 

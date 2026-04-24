@@ -132,35 +132,62 @@ const API = (() => {
    * Fetch DexScreener pair data for up to 30 token addresses per request.
    * Returns Map<lowercaseAddr, bestPair>.
    */
+  /**
+   * Parse a raw DexScreener pairs array into the result map.
+   * Prefers PulseChain pairs; when allChains=false, skips non-PulseChain.
+   */
+  function _ingestPairs(pairs, map, allChains) {
+    const grouped = new Map();
+    for (const p of (pairs || [])) {
+      if (!allChains && p.chainId !== 'pulsechain') continue;
+      const addr = (p.baseToken?.address || '').toLowerCase();
+      if (!addr || DENYLIST.has(addr)) continue;
+      const g = grouped.get(addr) || [];
+      g.push(p);
+      grouped.set(addr, g);
+    }
+    for (const [addr, ps] of grouped) {
+      if (map.has(addr)) continue;          // already resolved by an earlier method
+      const plsPairs = ps.filter(p => p.chainId === 'pulsechain');
+      map.set(addr, bestPair(plsPairs.length ? plsPairs : ps));
+    }
+  }
+
   async function getPairsByAddresses(addresses, allChains = false) {
     if (!addresses.length) return new Map();
     const map = new Map();
+    const lowers = addresses.map(a => a.toLowerCase());
 
-    // Chunk into groups of 30
+    // ── Stage 1: /tokens/ batch (30 per request) ──────────────────────────
+    // This is fast but misses tokens with no DexScreener "token profile".
     const chunks = [];
-    for (let i = 0; i < addresses.length; i += 30) chunks.push(addresses.slice(i, i + 30));
+    for (let i = 0; i < lowers.length; i += 30) chunks.push(lowers.slice(i, i + 30));
 
     await Promise.allSettled(chunks.map(async chunk => {
-      const data  = await get(`${DSX}/tokens/${chunk.join(',')}`);
-      // allChains=false (default): PulseChain only. allChains=true (watchlist): all chains.
-      const pairs = allChains
-        ? (data.pairs || [])
-        : (data.pairs || []).filter(p => p.chainId === 'pulsechain');
-      // Group by token address, pick best pair per token
-      const grouped = new Map();
-      for (const p of pairs) {
-        const addr = p.baseToken?.address?.toLowerCase();
-        if (!addr || DENYLIST.has(addr)) continue;
-        const group = grouped.get(addr) || [];
-        group.push(p);
-        grouped.set(addr, group);
-      }
-      for (const [addr, ps] of grouped) {
-        // When allChains, prefer PulseChain pair if one exists
-        const plsPairs = ps.filter(p => p.chainId === 'pulsechain');
-        map.set(addr, bestPair(plsPairs.length ? plsPairs : ps));
-      }
+      try {
+        const data = await get(`${DSX}/tokens/${chunk.join(',')}`, 15000);
+        _ingestPairs(data.pairs, map, allChains);
+      } catch (e) { console.warn('[getPairsByAddresses] /tokens/ chunk failed:', e.message); }
     }));
+
+    // ── Stage 2: DexScreener search fallback for any address still missing ─
+    // /latest/dex/search?q=ADDRESS always finds the best pair for that address.
+    const missing = lowers.filter(a => !map.has(a));
+    if (missing.length) {
+      await Promise.allSettled(missing.map(async addr => {
+        try {
+          const data = await get(`${DSX}/search?q=${encodeURIComponent(addr)}`, 12000);
+          _ingestPairs(data.pairs, map, allChains);
+          // DexScreener search may return the token as quoteToken — check both sides
+          for (const p of (data.pairs || [])) {
+            const qt = (p.quoteToken?.address || '').toLowerCase();
+            if (qt === addr && !map.has(addr) && !DENYLIST.has(addr)) {
+              map.set(addr, p);
+            }
+          }
+        } catch (e) { console.warn('[getPairsByAddresses] /search fallback failed for', addr, e.message); }
+      }));
+    }
 
     return map;
   }
@@ -479,30 +506,59 @@ const API = (() => {
 
   /**
    * Fetch token prices from Moralis for a list of PulseChain addresses.
+   * Stage 1: batch POST /erc20/prices (fast, up to 25 per call).
+   * Stage 2: individual GET /erc20/ADDRESS/price for any address still missing.
    * Returns Map<lowercaseAddr, {priceUsd, priceChange24h, logo}>.
-   * Used by watchlist to fill in prices when DexScreener has no pair data.
    */
   async function getMoralisTokenPrices(addresses) {
     const map = new Map();
-    if (!addresses.length) return map;
-    try {
-      const addrs = addresses.filter(a => !a.startsWith('cg:')).join(',');
-      if (!addrs) return map;
-      const data = await get(`/api/moralis/token-prices?addresses=${encodeURIComponent(addrs)}`, 20000);
-      if (Array.isArray(data)) {
-        data.forEach(t => {
-          const addr = (t.tokenAddress || t.token_address || '').toLowerCase();
-          if (!addr) return;
-          map.set(addr, {
-            priceUsd:      t.usdPrice      != null ? Number(t.usdPrice)      : (t.usd_price != null ? Number(t.usd_price) : null),
-            priceChange24h: t.usdPricePercentChange?.oneDay != null
-                            ? Number(t.usdPricePercentChange.oneDay)
-                            : (t['24hrPercentChange'] != null ? Number(t['24hrPercentChange']) : null),
-            logo:          t.tokenLogo || t.logo || null,
-          });
-        });
+    const filtered = addresses.filter(a => a && !a.startsWith('cg:'));
+    if (!filtered.length) return map;
+
+    function ingestMoralisItem(t) {
+      const addr = (t.tokenAddress || t.token_address || '').toLowerCase();
+      if (!addr) return;
+      const priceUsd = t.usdPrice != null ? Number(t.usdPrice) : (t.usd_price != null ? Number(t.usd_price) : null);
+      const priceChange24h = t.usdPricePercentChange?.oneDay != null
+        ? Number(t.usdPricePercentChange.oneDay)
+        : (t['24hrPercentChange'] != null ? Number(t['24hrPercentChange']) : null);
+      const logo = t.tokenLogo || t.thumbnail || t.logo || null;
+      if (!map.has(addr) || priceUsd != null) {
+        map.set(addr, { priceUsd, priceChange24h, logo });
       }
-    } catch (e) { console.warn('[getMoralisTokenPrices]', e.message); }
+    }
+
+    // Stage 1: batch
+    try {
+      const addrs = filtered.join(',');
+      const data = await get(`/api/moralis/token-prices?addresses=${encodeURIComponent(addrs)}`, 20000);
+      if (Array.isArray(data)) data.forEach(ingestMoralisItem);
+    } catch (e) { console.warn('[getMoralisTokenPrices] batch failed:', e.message); }
+
+    // Stage 2: individual fallback for addresses still missing or with null price
+    const stillMissing = filtered.filter(a => {
+      const entry = map.get(a);
+      return !entry || entry.priceUsd == null;
+    });
+    if (stillMissing.length) {
+      await Promise.allSettled(stillMissing.map(async addr => {
+        try {
+          const data = await get(`/api/moralis/token-price/${encodeURIComponent(addr)}`, 10000);
+          if (data && !data.error) {
+            const entry = {
+              priceUsd:       data.usdPrice != null ? Number(data.usdPrice) : null,
+              priceChange24h: data.usdPricePercentChange?.oneDay != null
+                              ? Number(data.usdPricePercentChange.oneDay)
+                              : null,
+              logo:           data.tokenLogo || null,
+            };
+            // Only store if we got a price
+            if (entry.priceUsd != null) map.set(addr, entry);
+          }
+        } catch { /* silently skip — token simply not indexed by Moralis */ }
+      }));
+    }
+
     return map;
   }
 

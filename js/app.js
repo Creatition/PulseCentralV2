@@ -432,16 +432,22 @@ let tickerTimer  = null;
 let tickerDur    = 60;
 
 function buildTickerItem(pair, rank) {
-  const symbol  = pair.baseToken?.symbol || '?';
-  const price   = Number(pair.priceUsd || 0);
+  const symbol    = pair.baseToken?.symbol || '?';
+  const price     = Number(pair.priceUsd || 0);
   const { text, cls } = fmt.change(Number(pair.priceChange?.h24 || 0));
-  const pairAddr = pair.pairAddress || '';
-  const tokenAddr = pair.baseToken?.address || '';
-  const logoUrl  = API.logoUrl(pair, tokenAddr);
+  const pairAddr  = pair.pairAddress || '';
+  const tokenAddr = (pair.baseToken?.address || '').toLowerCase();
+  const chainId   = pair.chainId || 'pulsechain';
+  // Use pair's own image > info.imageUrl > DexScreener CDN (chain-aware) > stored logoUrl
+  const logoUrl   = pair.info?.imageUrl
+    || (tokenAddr ? `https://dd.dexscreener.com/ds-data/tokens/${chainId}/${tokenAddr}.png` : null);
 
   const a = document.createElement('a');
   a.className = 'ticker-item';
-  a.href = pairAddr ? `https://dexscreener.com/pulsechain/${pairAddr}` : '#';
+  // Link to DexScreener using actual chain, or token address search if no pair
+  a.href = pairAddr
+    ? `https://dexscreener.com/${chainId}/${pairAddr}`
+    : (tokenAddr ? `https://dexscreener.com/${chainId}/${tokenAddr}` : '#');
   a.target = '_blank'; a.rel = 'noopener noreferrer';
   a.title = `${symbol} ${text}`;
 
@@ -452,16 +458,17 @@ function buildTickerItem(pair, rank) {
     a.appendChild(r);
   }
 
-  // Build logo properly — try image first, fallback to placeholder
+  // Build logo — chain-aware CDN fallback
   const logoWrap = document.createElement('span');
   logoWrap.className = 'ticker-logo-wrap';
 
   const urls = [];
   if (logoUrl) urls.push(logoUrl);
   if (tokenAddr) {
-    const l = tokenAddr.toLowerCase();
-    urls.push(`https://dd.dexscreener.com/ds-data/tokens/pulsechain/${l}.png`);
-    urls.push(`https://scan.pulsechain.com/token-images/${l}.png`);
+    urls.push(`https://dd.dexscreener.com/ds-data/tokens/${chainId}/${tokenAddr}.png`);
+    if (chainId === 'pulsechain') {
+      urls.push(`https://scan.pulsechain.com/token-images/${tokenAddr}.png`);
+    }
   }
 
   if (urls.length > 0) {
@@ -552,10 +559,61 @@ async function loadWatchlistTicker() {
     return;
   }
   try {
-    const map   = await API.getPairsByAddresses(tokens.map(t => t.address));
-    const pairs = tokens.map(t => map.get(t.address.toLowerCase()) || { baseToken: { symbol: t.symbol, address: t.address }, priceUsd: 0, priceChange: {}, info: { imageUrl: t.logoUrl } });
+    const onChain  = tokens.filter(t => !t.address.startsWith('cg:'));
+    const cgTokens = tokens.filter(t =>  t.address.startsWith('cg:'));
+
+    // Fetch DexScreener (allChains) + Moralis fallback in parallel
+    const [pairMap, moralisMap] = await Promise.all([
+      onChain.length  ? API.getPairsByAddresses(onChain.map(t => t.address), true) : Promise.resolve(new Map()),
+      onChain.length  ? API.getMoralisTokenPrices(onChain.map(t => t.address))     : Promise.resolve(new Map()),
+    ]);
+
+    // Fetch CoinGecko for cg: tokens
+    let cgMap = new Map();
+    if (cgTokens.length) {
+      try {
+        const ids = cgTokens.map(t => t.address.replace('cg:', '')).join(',');
+        const res = await fetch(`/api/coingecko/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`);
+        const data = await res.json();
+        if (Array.isArray(data)) data.forEach(c => cgMap.set(`cg:${c.id}`, c));
+      } catch {}
+    }
+
+    // Build normalised pair-like objects for renderTicker
+    const pairs = tokens.map(token => {
+      const addrLow = token.address.toLowerCase();
+      const isCG    = token.address.startsWith('cg:');
+
+      if (isCG) {
+        const c = cgMap.get(token.address);
+        return {
+          baseToken:   { symbol: token.symbol, address: token.address },
+          priceUsd:    c ? c.current_price    : 0,
+          priceChange: { h24: c ? (c.price_change_percentage_24h || 0) : 0 },
+          info:        { imageUrl: token.logoUrl || (c && c.image) || null },
+          pairAddress: null,
+        };
+      }
+
+      const pair = pairMap.get(addrLow);
+      if (pair) return pair;
+
+      // Moralis fallback — build a synthetic pair-like object
+      const m = moralisMap.get(addrLow);
+      return {
+        baseToken:   { symbol: token.symbol || '?', address: token.address },
+        priceUsd:    m && m.priceUsd    != null ? m.priceUsd    : 0,
+        priceChange: { h24: m && m.priceChange24h != null ? m.priceChange24h : 0 },
+        info:        { imageUrl: m && m.logo ? m.logo : (token.logoUrl || null) },
+        pairAddress: null,
+        _fromMoralis: true,
+      };
+    });
+
     renderTicker(pairs);
-  } catch { }
+  } catch (e) {
+    console.warn('[loadWatchlistTicker]', e);
+  }
 }
 
 $('ticker-mode-btn')?.addEventListener('click', () => {
