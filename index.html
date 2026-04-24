@@ -176,41 +176,103 @@
     <!-- Core coin cards grid -->
     <div class="coin-grid" id="coin-grid" role="list"></div>
 
-    <!-- Ecosystem quick-stats (populated by JS) -->
+    <!-- Ecosystem & Chain Stats (populated by JS) -->
     <div id="ecosystem-stats" class="hidden eco-section">
-      <div class="eco-title">Ecosystem</div>
-      <div class="eco-subtitle">PulseChain bridge &amp; network stats</div>
+      <div class="eco-title">PulseChain Network</div>
+      <div class="eco-subtitle">Live chain stats · Beacon consensus layer · Execution layer</div>
+
+      <!-- Row 1: Consensus layer -->
+      <div class="eco-row-label">⛓️ Consensus Layer</div>
       <div class="eco-grid">
 
-        <!-- Bridge TVL card -->
+        <div class="eco-card eco-card--beacon" id="eco-epoch-card">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">🔲</span>
+            <div><div class="eco-card-title">Epoch / Slot</div><div class="eco-card-desc">Current beacon chain position</div></div>
+          </div>
+          <div class="eco-metrics eco-metrics-2">
+            <div class="eco-metric"><div class="eco-metric-label">Epoch</div><div class="eco-metric-value" id="eco-epoch">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Slot</div><div class="eco-metric-value" id="eco-slot">—</div></div>
+          </div>
+          <div class="eco-source">Source: <a href="https://rpc-pulsechain.g4mm4.io/beacon-api/" target="_blank" rel="noopener">G4MM4 Beacon</a></div>
+        </div>
+
+        <div class="eco-card eco-card--beacon" id="eco-finality-card">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">✅</span>
+            <div><div class="eco-card-title">Finality</div><div class="eco-card-desc">Chain finalization status</div></div>
+          </div>
+          <div class="eco-metrics eco-metrics-2">
+            <div class="eco-metric"><div class="eco-metric-label">Finalized Epoch</div><div class="eco-metric-value" id="eco-finalized-epoch">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Lag</div><div class="eco-metric-value" id="eco-finality-lag">—</div></div>
+          </div>
+          <div class="eco-finality-status" id="eco-finality-badge">—</div>
+          <div class="eco-source">Source: <a href="https://rpc-pulsechain.g4mm4.io/beacon-api/" target="_blank" rel="noopener">G4MM4 Beacon</a></div>
+        </div>
+
+        <div class="eco-card eco-card--beacon" id="eco-validators-card">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">🏛️</span>
+            <div><div class="eco-card-title">Validators</div><div class="eco-card-desc">Network participants</div></div>
+          </div>
+          <div class="eco-metrics">
+            <div class="eco-metric"><div class="eco-metric-label">Active</div><div class="eco-metric-value up" id="eco-validators-active">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Pending</div><div class="eco-metric-value" id="eco-validators-pending">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Total</div><div class="eco-metric-value" id="eco-validators-total">—</div></div>
+          </div>
+          <div class="eco-source">Source: <a href="https://rpc-pulsechain.g4mm4.io/beacon-api/" target="_blank" rel="noopener">G4MM4 Beacon</a></div>
+        </div>
+
+      </div>
+
+      <!-- Row 2: Execution layer -->
+      <div class="eco-row-label" style="margin-top:1.25rem;">⚡ Execution Layer</div>
+      <div class="eco-grid">
+
+        <div class="eco-card" id="eco-block-card">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">🧱</span>
+            <div><div class="eco-card-title">Block Stats</div><div class="eco-card-desc">Latest block data</div></div>
+          </div>
+          <div class="eco-metrics">
+            <div class="eco-metric"><div class="eco-metric-label">Block #</div><div class="eco-metric-value" id="eco-block-number">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Avg Time</div><div class="eco-metric-value" id="eco-block-time">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Tx/Block</div><div class="eco-metric-value" id="eco-tx-per-block">—</div></div>
+          </div>
+          <div class="eco-source">Source: <a href="https://scan.pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a></div>
+        </div>
+
+        <div class="eco-card" id="eco-gas-card">
+          <div class="eco-card-head">
+            <span class="eco-card-icon">⛽</span>
+            <div><div class="eco-card-title">Gas &amp; Throughput</div><div class="eco-card-desc">Network congestion</div></div>
+          </div>
+          <div class="eco-metrics eco-metrics-2">
+            <div class="eco-metric"><div class="eco-metric-label">Gas Price</div><div class="eco-metric-value" id="eco-gas-price">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">Est. TPS</div><div class="eco-metric-value" id="eco-tps">—</div></div>
+          </div>
+          <div class="eco-source">Source: <a href="https://scan.pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a></div>
+        </div>
+
         <div class="eco-card" id="eco-bridge">
           <div class="eco-card-head">
             <span class="eco-card-icon">🌉</span>
-            <div>
-              <div class="eco-card-title">Bridge TVL</div>
-              <div class="eco-card-desc">PulseChain ↔ Ethereum</div>
-            </div>
+            <div><div class="eco-card-title">Bridge TVL</div><div class="eco-card-desc">PulseChain ↔ Ethereum</div></div>
           </div>
           <div class="eco-metrics">
-            <div class="eco-metric">
-              <div class="eco-metric-label">Current</div>
-              <div class="eco-metric-value" data-eco="bridge-now">—</div>
-            </div>
-            <div class="eco-metric">
-              <div class="eco-metric-label">7d</div>
-              <div class="eco-metric-value" data-eco="bridge-7d">—</div>
-            </div>
-            <div class="eco-metric">
-              <div class="eco-metric-label">30d</div>
-              <div class="eco-metric-value" data-eco="bridge-30d">—</div>
-            </div>
+            <div class="eco-metric"><div class="eco-metric-label">Current</div><div class="eco-metric-value" data-eco="bridge-now">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">7d</div><div class="eco-metric-value" data-eco="bridge-7d">—</div></div>
+            <div class="eco-metric"><div class="eco-metric-label">30d</div><div class="eco-metric-value" data-eco="bridge-30d">—</div></div>
           </div>
           <div class="eco-chart" data-eco="bridge-chart"></div>
           <div class="eco-source">Source: <a href="https://defillama.com/protocol/pulsechain-bridge" target="_blank" rel="noopener">DefiLlama</a></div>
         </div>
 
       </div>
+
     </div>
+
+      </div>
 
   </div><!-- /page -->
 </div><!-- /tab-home -->

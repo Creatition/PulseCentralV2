@@ -18,7 +18,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://cdn.dexscreener.com https://dd.dexscreener.com https://dexscreener.com https://icons.llamao.fi https://scan.pulsechain.com https://libertyswap.finance https://9mm.pro https://app.piteas.io https://www.geckoterminal.com https://hex.com https://www.dextools.io https://www.google.com https://t2.gstatic.com https://coin-images.coingecko.com https://assets.coingecko.com https://pump.tires",
     "frame-src https://dexscreener.com https://pulsex.mypinata.cloud",
-    "connect-src 'self'",
+    "connect-src 'self' https://rpc-pulsechain.g4mm4.io https://raw.githubusercontent.com",
     "object-src 'none'",
     "base-uri 'self'",
   ].join('; '));
@@ -1049,6 +1049,274 @@ app.get('/api/pulsechain/token-library', async (req, res) => {
   });
 });
 
+
+
+
+/* ══════════════════════════════════════════════════════════
+   BEACON API — PulseChain consensus layer stats
+   Base: https://rpc-pulsechain.g4mm4.io/beacon-api/
+   ══════════════════════════════════════════════════════════ */
+
+const BEACON_BASE = 'https://rpc-pulsechain.g4mm4.io/beacon-api';
+
+async function beaconFetch(path, ttlMs = 30_000) {
+  const cacheKey = `beacon:${path}`;
+  const cached = getCached(cacheKey, ttlMs);
+  if (cached) return cached;
+  const r = await fetch(`${BEACON_BASE}${path}`, {
+    headers: { 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!r.ok) throw new Error(`Beacon HTTP ${r.status}`);
+  const data = await r.json();
+  setCached(cacheKey, data);
+  return data;
+}
+
+// Aggregate chain stats endpoint — single call from client gets everything
+app.get('/api/beacon/chain-stats', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const cacheKey = 'beacon:chain-stats-agg';
+  const cached = getCached(cacheKey, 30_000);
+  if (cached) return res.json(cached);
+
+  try {
+    // Fire all beacon calls in parallel
+    const [head, finality, validators, genesis] = await Promise.allSettled([
+      beaconFetch('/eth/v1/beacon/headers/head', 12_000),
+      beaconFetch('/eth/v1/beacon/states/head/finality_checkpoints', 30_000),
+      beaconFetch('/eth/v1/beacon/states/head/validator_count', 60_000),
+      beaconFetch('/eth/v1/beacon/genesis', 3_600_000), // genesis never changes
+    ]);
+
+    const result = {};
+
+    // Head slot & epoch
+    if (head.status === 'fulfilled') {
+      const h = head.value?.data;
+      if (h) {
+        const slot = parseInt(h.header?.message?.slot || h.slot || 0);
+        const epoch = Math.floor(slot / 32);
+        result.slot  = slot;
+        result.epoch = epoch;
+        // Compute slot time from genesis
+        if (genesis.status === 'fulfilled') {
+          const genesisTime = parseInt(genesis.value?.data?.genesis_time || 0);
+          if (genesisTime > 0) {
+            const SLOT_DURATION = 12; // PulseChain: 12s per slot
+            result.slotTime    = new Date((genesisTime + slot * SLOT_DURATION) * 1000).toISOString();
+            result.genesisTime = genesisTime;
+            result.slotDuration = SLOT_DURATION;
+            result.blockTime   = SLOT_DURATION; // avg block time = slot duration
+          }
+        }
+      }
+    }
+
+    // Finality
+    if (finality.status === 'fulfilled') {
+      const f = finality.value?.data;
+      if (f) {
+        result.finalizedEpoch  = parseInt(f.finalized?.epoch  || 0);
+        result.justifiedEpoch  = parseInt(f.current_justified?.epoch || 0);
+        result.finalizedRoot   = f.finalized?.root || null;
+        // Finalization lag: how many epochs behind head
+        if (result.epoch && result.finalizedEpoch) {
+          result.finalizationLag = result.epoch - result.finalizedEpoch;
+        }
+      }
+    }
+
+    // Validator counts
+    if (validators.status === 'fulfilled') {
+      const v = validators.value?.data;
+      if (v) {
+        result.activeValidators  = parseInt(v.active_ongoing  || v.active  || 0);
+        result.pendingValidators = parseInt(v.pending_queued  || v.pending || 0);
+        result.exitedValidators  = parseInt(v.exited_slashed  || 0) + parseInt(v.withdrawal_done || 0);
+        result.totalValidators   = (result.activeValidators || 0) + (result.pendingValidators || 0);
+      }
+    }
+
+    setCached(cacheKey, result);
+    res.json(result);
+  } catch (e) {
+    console.warn('[beacon/chain-stats]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Raw beacon proxy for flexibility
+app.get('/api/beacon/*', async (req, res) => {
+  const p = sanitise(req.params[0]);
+  if (!p) return res.status(400).json({ error: 'Bad path' });
+  try {
+    const data = await beaconFetch(`/${p}${qs(req)}`, 30_000);
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════
+   PITEAS TOKENLIST — enriched token data for PulseChain
+   https://raw.githubusercontent.com/piteasio/app-tokens/main/piteas-tokenlist.json
+   ══════════════════════════════════════════════════════════ */
+
+const PITEAS_URL = 'https://raw.githubusercontent.com/piteasio/app-tokens/main/piteas-tokenlist.json';
+let piteasCache = null;
+let piteasFetching = null;
+
+async function getPiteasTokenlist() {
+  if (piteasCache && (Date.now() - piteasCache.ts < 10 * 60_000)) return piteasCache.data; // 10 min TTL
+  if (piteasFetching) return piteasFetching;
+
+  piteasFetching = (async () => {
+    try {
+      const r = await fetch(PITEAS_URL, {
+        headers: { 'User-Agent': 'PulseCentral/1.0', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      piteasCache = { data, ts: Date.now() };
+      piteasFetching = null;
+
+      // Merge into pulseTokenLibrary — Piteas tokens are verified and well-maintained
+      if (Array.isArray(data.tokens)) {
+        let merged = 0;
+        for (const t of data.tokens) {
+          const addr = (t.address || '').toLowerCase();
+          if (!addr || addr.length !== 42) continue;
+          const existing = pulseTokenLibrary.get(addr);
+          const entry = {
+            address: addr,
+            symbol:  t.symbol || (existing && existing.symbol) || '?',
+            name:    t.name   || (existing && existing.name)   || t.symbol || '?',
+            logo:    t.logoURI || t.logo || (existing && existing.logo) || null,
+            decimals: t.decimals || 18,
+            _piteas: true,
+            ...(existing || {}),
+            // Override name/symbol/logo from Piteas (trusted source)
+            symbol: t.symbol || (existing && existing.symbol) || '?',
+            name:   t.name   || (existing && existing.name)   || '?',
+            logo:   t.logoURI || t.logo || (existing && existing.logo) || null,
+          };
+          pulseTokenLibrary.set(addr, entry);
+          merged++;
+        }
+        console.log(`[piteas] Merged ${merged} tokens into library`);
+      }
+      return data;
+    } catch (e) {
+      piteasFetching = null;
+      console.warn('[piteas] Fetch failed:', e.message);
+      throw e;
+    }
+  })();
+
+  return piteasFetching;
+}
+
+// Full tokenlist endpoint
+app.get('/api/piteas/tokenlist', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const data = await getPiteasTokenlist();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Lightweight address-lookup endpoint — returns single token metadata
+app.get('/api/piteas/token/:address', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const addr = (req.params.address || '').toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(addr)) return res.status(400).json({ error: 'Invalid address' });
+  try {
+    const data = await getPiteasTokenlist();
+    const token = (data.tokens || []).find(t => (t.address || '').toLowerCase() === addr);
+    if (!token) return res.json(null);
+    res.json(token);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Kick off Piteas fetch on server start (warm cache)
+setTimeout(() => getPiteasTokenlist().catch(e => console.warn('[piteas] Warm-up failed:', e.message)), 3000);
+
+/* ══════════════════════════════════════════════════════════
+   EXECUTION LAYER — PulseChain RPC stats (block time, gas)
+   ══════════════════════════════════════════════════════════ */
+
+const PLS_RPC = 'https://rpc-pulsechain.g4mm4.io';
+
+async function rpcCall(method, params = []) {
+  const r = await fetch(PLS_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!r.ok) throw new Error(`RPC HTTP ${r.status}`);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message || 'RPC error');
+  return d.result;
+}
+
+app.get('/api/chain/exec-stats', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const cacheKey = 'chain:exec-stats';
+  const cached = getCached(cacheKey, 15_000);
+  if (cached) return res.json(cached);
+
+  try {
+    // Get latest block number and gas price in parallel
+    const [blockHex, gasPriceHex] = await Promise.all([
+      rpcCall('eth_blockNumber'),
+      rpcCall('eth_gasPrice'),
+    ]);
+
+    const blockNum = parseInt(blockHex, 16);
+    const gasGwei  = parseInt(gasPriceHex, 16) / 1e9;
+
+    // Fetch latest block + block from ~100 blocks ago for TPS estimate
+    const [latestBlock, oldBlock] = await Promise.all([
+      rpcCall('eth_getBlockByNumber', ['latest', false]),
+      rpcCall('eth_getBlockByNumber', [`0x${(blockNum - 100).toString(16)}`, false]),
+    ]);
+
+    const result = {
+      blockNumber: blockNum,
+      gasPrice:    parseFloat(gasGwei.toFixed(4)),
+      timestamp:   parseInt(latestBlock?.timestamp || 0, 16),
+    };
+
+    // Calculate avg block time over last 100 blocks
+    if (latestBlock && oldBlock) {
+      const t1 = parseInt(latestBlock.timestamp, 16);
+      const t0 = parseInt(oldBlock.timestamp, 16);
+      const blocks = blockNum - parseInt(oldBlock.number, 16);
+      if (blocks > 0 && t1 > t0) {
+        result.avgBlockTime = parseFloat(((t1 - t0) / blocks).toFixed(2));
+      }
+      // Estimate TPS from latest block tx count
+      const txCount = parseInt(latestBlock.transactions?.length || latestBlock.transactionCount || 0);
+      if (result.avgBlockTime > 0 && txCount >= 0) {
+        result.tps = parseFloat((txCount / result.avgBlockTime).toFixed(2));
+        result.txPerBlock = txCount;
+      }
+    }
+
+    setCached(cacheKey, result);
+    res.json(result);
+  } catch (e) {
+    console.warn('[chain/exec-stats]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
 
 /* ── Static files ─────────────────────────────────────── */
 

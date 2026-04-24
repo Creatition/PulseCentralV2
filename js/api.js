@@ -703,6 +703,21 @@ const API = (() => {
     catch { return null; }
   }
 
+  async function getBeaconChainStats() {
+    try { return await get('/api/beacon/chain-stats', 15000); }
+    catch { return null; }
+  }
+
+  async function getExecStats() {
+    try { return await get('/api/chain/exec-stats', 15000); }
+    catch { return null; }
+  }
+
+  async function getPiteasTokenlist() {
+    try { return await get('/api/piteas/tokenlist', 30000); }
+    catch { return null; }
+  }
+
   /* ── Public surface ───────────────────────────────── */
   return {
     CORE_COINS,
@@ -726,5 +741,8 @@ const API = (() => {
     getBridgeStats,
     getFearGreed,
     getGlobalMarket,
+    getBeaconChainStats,
+    getExecStats,
+    getPiteasTokenlist,
   };
 })();

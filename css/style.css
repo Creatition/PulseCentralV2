@@ -2724,3 +2724,56 @@ a.commodity-card:hover {
   z-index: 9999;
   opacity: 1;
 }
+
+/* ══════════════════════════════════════════════════════
+   CHAIN STATS — extended ecosystem section
+   ══════════════════════════════════════════════════════ */
+
+.eco-row-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-3);
+  margin: 1rem 0 .5rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.eco-card--beacon {
+  border-color: rgba(123,47,255,.3);
+  background: linear-gradient(145deg, var(--bg-1), rgba(123,47,255,.04));
+}
+
+.eco-card--beacon:hover {
+  border-color: var(--primary);
+}
+
+.eco-metrics-2 {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+
+/* Finality status badge */
+.eco-finality-status {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .25rem .6rem;
+  border-radius: 99px;
+  text-align: center;
+  margin-top: -.15rem;
+}
+
+.eco-finality-ok   { background: rgba(34,197,94,.15);  color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+.eco-finality-warn { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+.eco-finality-err  { background: rgba(239,68,68,.15);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+
+/* Pulse/glow animation on beacon cards when data is live */
+@keyframes beacon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(123,47,255,.0); }
+  50%       { box-shadow: 0 0 12px 2px rgba(123,47,255,.18); }
+}
+.eco-card--beacon.live {
+  animation: beacon-pulse 3s ease-in-out infinite;
+}
+

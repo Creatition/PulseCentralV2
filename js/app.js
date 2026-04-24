@@ -917,18 +917,77 @@ function miniChartSvg(values, color) {
 async function loadEcosystemStats() {
   const section = $('ecosystem-stats');
 
-  // Run all in parallel
-  const [bridge, fear, global_] = await Promise.allSettled([
+  // Fire all data sources in parallel — beacon, exec layer, bridge, fear&greed, global
+  const [beacon, exec, bridge, fear, global_] = await Promise.allSettled([
+    API.getBeaconChainStats(),
+    API.getExecStats(),
     API.getBridgeStats(),
     API.getFearGreed(),
     API.getGlobalMarket(),
   ]);
 
-  // ── Helper: set text safely
   const setText = (id, v) => { const e = $(id); if (e) e.textContent = v; };
   const pct = (n, t) => (!t || !n) ? '—' : (((n - t) / t) * 100 >= 0 ? '+' : '') + (((n - t) / t) * 100).toFixed(1) + '%';
+  const fmtNum = n => n != null && n > 0 ? Number(n).toLocaleString() : '—';
 
-  // ── Bridge TVL — confirmed: bridge.tvl is an array, chain key is "Ethereum"
+  // ── Beacon: Epoch / Slot ──────────────────────────────────
+  if (beacon.status === 'fulfilled' && beacon.value) {
+    const b = beacon.value;
+
+    if (b.epoch != null) setText('eco-epoch', fmtNum(b.epoch));
+    if (b.slot  != null) setText('eco-slot',  fmtNum(b.slot));
+
+    // Finality
+    if (b.finalizedEpoch != null) setText('eco-finalized-epoch', fmtNum(b.finalizedEpoch));
+    if (b.finalizationLag != null) {
+      const lag = b.finalizationLag;
+      const lagEl = $('eco-finality-lag');
+      if (lagEl) {
+        lagEl.textContent = lag <= 2 ? `${lag} ep` : `${lag} ep ⚠️`;
+        lagEl.className = 'eco-metric-value ' + (lag <= 2 ? 'up' : 'down');
+      }
+    }
+
+    // Finality status badge
+    const badge = $('eco-finality-badge');
+    if (badge && b.finalizationLag != null) {
+      const lag = b.finalizationLag;
+      if (lag <= 2) {
+        badge.textContent = '✅ Finalizing normally';
+        badge.className   = 'eco-finality-status eco-finality-ok';
+      } else if (lag <= 5) {
+        badge.textContent = '⚠️ Slightly delayed';
+        badge.className   = 'eco-finality-status eco-finality-warn';
+      } else {
+        badge.textContent = '🔴 Finality stalled';
+        badge.className   = 'eco-finality-status eco-finality-err';
+      }
+    }
+
+    // Validators
+    if (b.activeValidators  != null) setText('eco-validators-active',  fmtNum(b.activeValidators));
+    if (b.pendingValidators != null) setText('eco-validators-pending', b.pendingValidators > 0 ? fmtNum(b.pendingValidators) : '0');
+    if (b.totalValidators   != null) setText('eco-validators-total',   fmtNum(b.totalValidators));
+  }
+
+  // ── Execution layer: blocks, gas, TPS ────────────────────
+  if (exec.status === 'fulfilled' && exec.value) {
+    const e = exec.value;
+
+    if (e.blockNumber != null) setText('eco-block-number', `#${fmtNum(e.blockNumber)}`);
+    if (e.avgBlockTime != null) setText('eco-block-time',  `${e.avgBlockTime}s`);
+    if (e.txPerBlock   != null) setText('eco-tx-per-block', fmtNum(e.txPerBlock));
+    if (e.gasPrice     != null) {
+      const gEl = $('eco-gas-price');
+      if (gEl) gEl.textContent = `${e.gasPrice.toFixed(1)} Gwei`;
+    }
+    if (e.tps != null) {
+      const tEl = $('eco-tps');
+      if (tEl) tEl.textContent = e.tps > 0 ? `${e.tps} tx/s` : '< 1 tx/s';
+    }
+  }
+
+  // ── Bridge TVL ───────────────────────────────────────────
   if (bridge.status === 'fulfilled' && bridge.value) {
     const b = bridge.value;
     let history = [];
@@ -941,7 +1000,6 @@ async function loadEcosystemStats() {
     const ago30= vals.length >= 30 ? vals[vals.length - 30] : now;
     const chartSvg = vals.length >= 2 ? miniChartSvg(vals.slice(-90), '#00bcd4') : '';
 
-    // Home tab eco-bridge card (uses data-eco attributes)
     const homeCard = $('eco-bridge');
     if (homeCard) {
       const setM = (key, v) => { const e = homeCard.querySelector(`[data-eco="${key}"]`); if (e) e.textContent = v; };
@@ -952,7 +1010,6 @@ async function loadEcosystemStats() {
       if (chart && chartSvg) chart.innerHTML = chartSvg;
     }
 
-    // Ecosystem tab dedicated elements
     setText('eco-bridge-tvl-now', now ? fmt.large(now) : '—');
     setText('eco-bridge-tvl-7d',  pct(now, ago7));
     setText('eco-bridge-tvl-30d', pct(now, ago30));
@@ -960,19 +1017,17 @@ async function loadEcosystemStats() {
     if (ecoChart && chartSvg) ecoChart.innerHTML = chartSvg;
   }
 
-  // ── Fear & Greed
+  // ── Fear & Greed ─────────────────────────────────────────
   if (fear.status === 'fulfilled' && fear.value) {
     const entry = fear.value?.data?.[0];
     if (entry) {
-      const label = `${entry.value} — ${entry.value_classification}`;
-      // Update nav stats bar
       const navFear = $('nav-fear-greed');
       if (navFear) navFear.textContent = `😱 ${entry.value}`;
-      setText('eco-fear-value', label);
+      setText('eco-fear-value', `${entry.value} — ${entry.value_classification}`);
     }
   }
 
-  // ── Global market
+  // ── Global market ────────────────────────────────────────
   if (global_.status === 'fulfilled' && global_.value) {
     const d = global_.value?.data;
     if (d) {
@@ -988,10 +1043,58 @@ async function loadEcosystemStats() {
     }
   }
 
-  // Hide eco-loading spinner and show content
+  // Animate beacon cards once live
+  ['eco-epoch-card','eco-finality-card','eco-validators-card'].forEach(id => {
+    const el = $(id); if (el) el.classList.add('live');
+  });
+
   hide($('eco-loading'));
   if (section) show(section);
 }
+
+/* ── Piteas tokenlist enrichment — runs once on startup ── */
+let piteasTokenMap = null; // addr → {symbol, name, logoURI}
+
+async function loadPiteasTokenlist() {
+  if (piteasTokenMap) return piteasTokenMap;
+  try {
+    const data = await API.getPiteasTokenlist();
+    if (!data || !Array.isArray(data.tokens)) return new Map();
+    piteasTokenMap = new Map();
+    data.tokens.forEach(t => {
+      const addr = (t.address || '').toLowerCase();
+      if (addr) piteasTokenMap.set(addr, {
+        symbol:  t.symbol || null,
+        name:    t.name   || null,
+        logoUrl: t.logoURI || t.logo || null,
+        decimals: t.decimals || 18,
+      });
+    });
+    console.log(`[piteas] Loaded ${piteasTokenMap.size} tokens for client enrichment`);
+  } catch (e) {
+    console.warn('[piteas] Client load failed:', e.message);
+    piteasTokenMap = new Map();
+  }
+  return piteasTokenMap;
+}
+
+/**
+ * Enrich a token entry with Piteas data if available.
+ * Pass the token's contract address (lowercase) to look it up.
+ */
+function piteasEnrich(addr, existingLogoUrl, existingSymbol, existingName) {
+  if (!piteasTokenMap) return { logoUrl: existingLogoUrl, symbol: existingSymbol, name: existingName };
+  const t = piteasTokenMap.get((addr || '').toLowerCase());
+  if (!t) return { logoUrl: existingLogoUrl, symbol: existingSymbol, name: existingName };
+  return {
+    logoUrl: existingLogoUrl || t.logoUrl,
+    symbol:  existingSymbol  || t.symbol,
+    name:    existingName    || t.name,
+  };
+}
+
+// Load Piteas list in background — doesn't block page render
+loadPiteasTokenlist();
 
 /* ══════════════════════════════════════════════════════
    MARKETS TAB
