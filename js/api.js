@@ -739,34 +739,6 @@ const API = (() => {
     catch { return null; }
   }
 
-  /* ── New Listings ──────────────────────────────────── */
-
-  /**
-   * Fetch newly-listed PulseChain tokens from the server scanner.
-   * Server polls DexScreener, GeckoTerminal, Moralis every 3 minutes.
-   */
-  async function getNewListings({ page = 1, pageSize = 50, sortBy = 'newest', minLiq = 0 } = {}) {
-    try {
-      return await get(`/api/pulsechain/new-listings?page=${page}&pageSize=${pageSize}&sortBy=${sortBy}&minLiq=${minLiq}`, 15000);
-    } catch { return { total: 0, tokens: [] }; }
-  }
-
-  /**
-   * Subscribe to real-time new listing events via SSE.
-   * onToken(tokenData) is called whenever new tokens are detected.
-   * Returns an EventSource instance (call .close() to unsubscribe).
-   */
-  function subscribeNewListings(onUpdate) {
-    const es = new EventSource('/api/pulsechain/new-listings/stream');
-    es.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data);
-        if (typeof onUpdate === 'function') onUpdate(data);
-      } catch { /* ignore parse errors */ }
-    };
-    es.onerror = () => { /* SSE auto-reconnects */ };
-    return es;
-  }
 
   /* ── Public surface ───────────────────────────────── */
   return {
@@ -794,7 +766,5 @@ const API = (() => {
     getBeaconChainStats,
     getExecStats,
     getPiteasTokenlist,
-    getNewListings,
-    subscribeNewListings,
   };
 })();
