@@ -132,7 +132,7 @@ const API = (() => {
    * Fetch DexScreener pair data for up to 30 token addresses per request.
    * Returns Map<lowercaseAddr, bestPair>.
    */
-  async function getPairsByAddresses(addresses) {
+  async function getPairsByAddresses(addresses, allChains = false) {
     if (!addresses.length) return new Map();
     const map = new Map();
 
@@ -142,7 +142,10 @@ const API = (() => {
 
     await Promise.allSettled(chunks.map(async chunk => {
       const data  = await get(`${DSX}/tokens/${chunk.join(',')}`);
-      const pairs = (data.pairs || []).filter(p => p.chainId === 'pulsechain');
+      // allChains=false (default): PulseChain only. allChains=true (watchlist): all chains.
+      const pairs = allChains
+        ? (data.pairs || [])
+        : (data.pairs || []).filter(p => p.chainId === 'pulsechain');
       // Group by token address, pick best pair per token
       const grouped = new Map();
       for (const p of pairs) {
@@ -153,7 +156,9 @@ const API = (() => {
         grouped.set(addr, group);
       }
       for (const [addr, ps] of grouped) {
-        map.set(addr, bestPair(ps));
+        // When allChains, prefer PulseChain pair if one exists
+        const plsPairs = ps.filter(p => p.chainId === 'pulsechain');
+        map.set(addr, bestPair(plsPairs.length ? plsPairs : ps));
       }
     }));
 
@@ -472,6 +477,35 @@ const API = (() => {
     return 0;
   }
 
+  /**
+   * Fetch token prices from Moralis for a list of PulseChain addresses.
+   * Returns Map<lowercaseAddr, {priceUsd, priceChange24h, logo}>.
+   * Used by watchlist to fill in prices when DexScreener has no pair data.
+   */
+  async function getMoralisTokenPrices(addresses) {
+    const map = new Map();
+    if (!addresses.length) return map;
+    try {
+      const addrs = addresses.filter(a => !a.startsWith('cg:')).join(',');
+      if (!addrs) return map;
+      const data = await get(`/api/moralis/token-prices?addresses=${encodeURIComponent(addrs)}`, 20000);
+      if (Array.isArray(data)) {
+        data.forEach(t => {
+          const addr = (t.tokenAddress || t.token_address || '').toLowerCase();
+          if (!addr) return;
+          map.set(addr, {
+            priceUsd:      t.usdPrice      != null ? Number(t.usdPrice)      : (t.usd_price != null ? Number(t.usd_price) : null),
+            priceChange24h: t.usdPricePercentChange?.oneDay != null
+                            ? Number(t.usdPricePercentChange.oneDay)
+                            : (t['24hrPercentChange'] != null ? Number(t['24hrPercentChange']) : null),
+            logo:          t.tokenLogo || t.logo || null,
+          });
+        });
+      }
+    } catch (e) { console.warn('[getMoralisTokenPrices]', e.message); }
+    return map;
+  }
+
   async function getTotalSupply(addr) {
     try {
       const data = await get(`${SCAN}?module=stats&action=tokensupply&contractaddress=${addr}`, 8000);
@@ -627,6 +661,7 @@ const API = (() => {
     getPlsBalance,
     getTokenList,
     getPlsPrice,
+    getMoralisTokenPrices,
     getTotalSupply,
     getTokenSecurity,
     getTokenMetadata,

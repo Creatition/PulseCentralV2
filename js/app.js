@@ -2237,65 +2237,106 @@ async function loadWatchlistTab() {
   hide(empty); show(loading); hide(wrap);
 
   try {
-    // Separate on-chain tokens from CoinGecko watchlist entries
     const onChainTokens = tokens.filter(t => !t.address.startsWith('cg:'));
-    const cgTokens      = tokens.filter(t => t.address.startsWith('cg:'));
+    const cgTokens      = tokens.filter(t =>  t.address.startsWith('cg:'));
 
-    // Use allChains=true so watchlist shows data for tokens on any supported chain
-    const pairMap = onChainTokens.length
-      ? await API.getPairsByAddresses(onChainTokens.map(t => t.address), true)
-      : new Map();
+    // 1. DexScreener — allChains=true so tokens from any chain return a pair
+    const pairMapPromise = onChainTokens.length
+      ? API.getPairsByAddresses(onChainTokens.map(t => t.address), true)
+      : Promise.resolve(new Map());
 
-    // For CoinGecko tokens, fetch prices
-    let cgPriceMap = new Map();
+    // 2. Moralis price fallback for on-chain tokens that DexScreener may miss
+    const moralisPricesPromise = onChainTokens.length
+      ? API.getMoralisTokenPrices(onChainTokens.map(t => t.address))
+      : Promise.resolve(new Map());
+
+    // 3. CoinGecko for cg: tokens
+    let cgPriceMapPromise = Promise.resolve(new Map());
     if (cgTokens.length) {
-      try {
-        const ids = cgTokens.map(t => t.address.replace('cg:', '')).join(',');
-        const res = await fetch(`/api/coingecko/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          data.forEach(c => cgPriceMap.set(`cg:${c.id}`, c));
-        }
-      } catch {}
+      cgPriceMapPromise = (async () => {
+        const map = new Map();
+        try {
+          const ids = cgTokens.map(t => t.address.replace('cg:', '')).join(',');
+          const res = await fetch(`/api/coingecko/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`);
+          const data = await res.json();
+          if (Array.isArray(data)) data.forEach(c => map.set(`cg:${c.id}`, c));
+        } catch {}
+        return map;
+      })();
     }
 
+    const [pairMap, moralisPriceMap, cgPriceMap] = await Promise.all([
+      pairMapPromise, moralisPricesPromise, cgPriceMapPromise,
+    ]);
+
     hide(loading); show(wrap);
-    renderWatchlistTable(tokens, pairMap, cgPriceMap);
-  } catch {
+    renderWatchlistTable(tokens, pairMap, cgPriceMap, moralisPriceMap);
+  } catch (e) {
+    console.error('[loadWatchlistTab]', e);
     hide(loading); show(wrap);
-    renderWatchlistTable(tokens, new Map(), new Map());
+    renderWatchlistTable(tokens, new Map(), new Map(), new Map());
   }
 }
 
-function renderWatchlistTable(tokens, pairMap, cgPriceMap = new Map()) {
+function renderWatchlistTable(tokens, pairMap, cgPriceMap = new Map(), moralisPriceMap = new Map()) {
   const container = $('wl-rows');
   if (!container) return;
   container.innerHTML = '';
 
   tokens.forEach((token, idx) => {
-    const isCG   = token.address.startsWith('cg:');
-    const pair   = isCG ? null : pairMap.get(token.address.toLowerCase());
-    const cgCoin = isCG ? cgPriceMap.get(token.address) : null;
+    const isCG    = token.address.startsWith('cg:');
+    const addrLow = token.address.toLowerCase();
+    const pair    = isCG ? null : pairMap.get(addrLow);
+    const cgCoin  = isCG ? cgPriceMap.get(token.address) : null;
+    // Moralis fallback: used when DexScreener returns no pair for an on-chain token
+    const moralis = (!isCG && !pair) ? moralisPriceMap.get(addrLow) : null;
 
-    // Build a unified data object
-    const price  = isCG ? (cgCoin?.current_price ?? null) : (pair?.priceUsd != null ? Number(pair.priceUsd) : null);
-    const chg24  = isCG ? (cgCoin?.price_change_percentage_24h ?? null) : (pair?.priceChange?.h24 != null ? Number(pair.priceChange.h24) : null);
-    const mcap   = isCG ? (cgCoin?.market_cap ?? null) : (pair?.marketCap || pair?.fdv || null);
-    const vol    = isCG ? (cgCoin?.total_volume ?? null) : (pair?.volume?.h24 ?? null);
-    const liq    = isCG ? null : (pair?.liquidity?.usd ?? null);
-    const logo   = isCG ? (cgCoin?.image || token.logoUrl) : (API.logoUrl(pair, token.address) || token.logoUrl);
-    // Chain-aware DexScreener link
-    const pairChain = pair?.chainId || 'pulsechain';
-    const link   = isCG
-      ? `https://www.coingecko.com/en/coins/${token.address.replace('cg:', '')}`
-      : (pair?.pairAddress ? `https://dexscreener.com/${pairChain}/${pair.pairAddress}` : null);
+    // ── Price resolution (DexScreener → Moralis → null) ──────────────────
+    let price, chg24, mcap, vol, liq, logo, link, pairChain;
+
+    if (isCG) {
+      price  = cgCoin && cgCoin.current_price != null ? cgCoin.current_price : null;
+      chg24  = cgCoin && cgCoin.price_change_percentage_24h != null ? cgCoin.price_change_percentage_24h : null;
+      mcap   = cgCoin && cgCoin.market_cap != null ? cgCoin.market_cap : null;
+      vol    = cgCoin && cgCoin.total_volume != null ? cgCoin.total_volume : null;
+      liq    = null;
+      logo   = (cgCoin && cgCoin.image) || token.logoUrl || null;
+      link   = 'https://www.coingecko.com/en/coins/' + token.address.replace('cg:', '');
+    } else if (pair) {
+      // DexScreener pair — same data as shown on Markets/Home rows
+      price  = pair.priceUsd != null ? Number(pair.priceUsd) : null;
+      chg24  = pair.priceChange && pair.priceChange.h24 != null ? Number(pair.priceChange.h24) : null;
+      mcap   = pair.marketCap || pair.fdv || null;
+      vol    = pair.volume && pair.volume.h24 != null ? Number(pair.volume.h24) : null;
+      liq    = pair.liquidity && pair.liquidity.usd != null ? Number(pair.liquidity.usd) : null;
+      logo   = API.logoUrl(pair, token.address) || token.logoUrl || null;
+      pairChain = pair.chainId || 'pulsechain';
+      link   = pair.pairAddress
+        ? 'https://dexscreener.com/' + pairChain + '/' + pair.pairAddress
+        : 'https://dexscreener.com/pulsechain/' + addrLow;
+    } else if (moralis) {
+      // Moralis fallback for tokens with no DexScreener pair
+      price  = moralis.priceUsd != null ? moralis.priceUsd : null;
+      chg24  = moralis.priceChange24h != null ? moralis.priceChange24h : null;
+      mcap   = null;
+      vol    = null;
+      liq    = null;
+      logo   = moralis.logo || token.logoUrl || null;
+      link   = 'https://dexscreener.com/pulsechain/' + addrLow;
+    } else {
+      // No data from any source — show token identity, all metrics as —
+      price  = null; chg24 = null; mcap = null; vol = null; liq = null;
+      logo   = token.logoUrl || null;
+      link   = 'https://dexscreener.com/pulsechain/' + addrLow;
+    }
 
     const { text: chgText, cls: chgCls } = fmt.change(chg24);
 
     // Build market-row style div
     const row = document.createElement('div');
     row.className = 'market-row';
-    if (link) { row.style.cursor = 'pointer'; row.onclick = () => window.open(link, '_blank', 'noopener'); }
+    row.style.cursor = 'pointer';
+    row.onclick = () => window.open(link, '_blank', 'noopener');
 
     // Rank
     const rankEl = document.createElement('span');
@@ -2357,10 +2398,21 @@ async function addWatchlistToken() {
   if (!isValidAddr(addr)) { if (errEl) { errEl.textContent = 'Invalid address'; show(errEl); } return; }
   if (Watchlist.hasToken(addr.toLowerCase())) { if (errEl) { errEl.textContent = 'Already in watchlist'; show(errEl); } return; }
   try {
-    const map  = await API.getPairsByAddresses([addr]);
+    // Try DexScreener across all chains first, then Moralis as fallback for metadata
+    const map  = await API.getPairsByAddresses([addr], true);
     const pair = map.get(addr.toLowerCase());
-    if (!pair) { if (errEl) { errEl.textContent = 'Token not found on PulseChain'; show(errEl); } return; }
-    Watchlist.addToken({ address: addr.toLowerCase(), symbol: pair.baseToken?.symbol || '', name: pair.baseToken?.name || '', logoUrl: API.logoUrl(pair, addr) });
+    const symbol  = pair && pair.baseToken ? pair.baseToken.symbol : '';
+    const name    = pair && pair.baseToken ? (pair.baseToken.name || pair.baseToken.symbol) : '';
+    const logoUrl = pair ? API.logoUrl(pair, addr) : null;
+    if (!pair) {
+      // Moralis fallback — try to get at least metadata
+      const moralisMap = await API.getMoralisTokenPrices([addr]);
+      const m = moralisMap.get(addr.toLowerCase());
+      if (!m && !symbol) { if (errEl) { errEl.textContent = 'Token not found'; show(errEl); } return; }
+      Watchlist.addToken({ address: addr.toLowerCase(), symbol: symbol || addr.slice(0,6), name: name || addr.slice(0,10), logoUrl: (m && m.logo) || null });
+    } else {
+      Watchlist.addToken({ address: addr.toLowerCase(), symbol, name, logoUrl });
+    }
     if ($('wl-add-input')) $('wl-add-input').value = '';
     loadWatchlistTab();
   } catch (e) {

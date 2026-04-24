@@ -214,6 +214,44 @@ app.get('/api/moralis/pls-price', async (req, res) => {
   }
 });
 
+// Batch token price lookup — used by watchlist to enrich tokens Moralis knows about
+// Accepts ?addresses=0x...,0x...&chain=0x171 (defaults to PulseChain)
+app.get('/api/moralis/token-prices', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const raw   = (req.query.addresses || '').split(',').map(a => a.trim().toLowerCase()).filter(a => /^0x[0-9a-f]{40}$/i.test(a));
+  const chain = req.query.chain || PULSECHAIN_ID;
+  if (!raw.length) return res.json([]);
+  const cacheKey = `moralis-prices-${chain}-${raw.sort().join(',')}`;
+  const cached = getCached(cacheKey, 60_000); // 1 min cache
+  if (cached) return res.json(cached);
+  try {
+    // Moralis /erc20/prices accepts up to 25 addresses per request
+    const chunks = [];
+    for (let i = 0; i < raw.length; i += 25) chunks.push(raw.slice(i, i + 25));
+    const results = [];
+    for (const chunk of chunks) {
+      try {
+        const url = new URL(`${MORALIS_BASE}/erc20/prices`);
+        const r = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tokens: chunk.map(a => ({ token_address: a, chain })) }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          (Array.isArray(data) ? data : []).forEach(t => results.push(t));
+        }
+      } catch (e) { console.warn('[moralis/token-prices] chunk error:', e.message); }
+    }
+    setCached(cacheKey, results);
+    res.json(results);
+  } catch (e) {
+    console.error('[moralis/token-prices]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // Top PulseChain tokens by market cap (for markets page enrichment)
 // ── Moralis: comprehensive PulseChain token search ────
 // Searches for all significant PulseChain tokens using multiple strategies:
