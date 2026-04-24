@@ -39,6 +39,9 @@
         <button class="tab-dropdown-item" data-subtab="commodities" onclick="switchMarketsSubtab('commodities')">
           🪙 Commodities
         </button>
+        <button class="tab-dropdown-item" data-subtab="new-listings" onclick="switchMarketsSubtab('new-listings')">
+          🆕 New Listings
+        </button>
       </div>
     </div>
     <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio">
@@ -455,11 +458,84 @@
       </div>
     </div>
 
+    <!-- Sub-tab: New Listings -->
+    <div id="markets-sub-new-listings" class="markets-subtab hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div>
+          <div class="page-title">🆕 New Listings</div>
+          <div class="page-subtitle">Newly listed PulseChain tokens · Auto-scanned every 3 minutes</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span id="new-listings-scan-time" style="font-size:.72rem;color:var(--text-3);"></span>
+          <span id="new-listings-live-dot" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;color:#00e676;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#00e676;animation:pulse-dot 1.4s infinite;"></span>Live
+          </span>
+          <button class="btn btn-ghost btn-sm" id="new-listings-refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="market-toolbar" style="margin-top:.75rem;gap:.5rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--text-2);">
+          <span>Sort:</span>
+          <select class="input select" id="new-listings-sort" style="font-size:.78rem;padding:.25rem .5rem;height:auto;">
+            <option value="newest">🕐 Newest First</option>
+            <option value="volume">📊 Volume</option>
+            <option value="liquidity">💧 Liquidity</option>
+            <option value="change">📈 24h Change</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--text-2);">
+          <span>Min Liquidity:</span>
+          <select class="input select" id="new-listings-minliq" style="font-size:.78rem;padding:.25rem .5rem;height:auto;">
+            <option value="0">Any</option>
+            <option value="100">$100+</option>
+            <option value="1000">$1K+</option>
+            <option value="5000">$5K+</option>
+            <option value="10000">$10K+</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--text-2);">
+          <span id="new-listings-count" style="color:var(--text-3);"></span>
+        </div>
+      </div>
+
+      <!-- Loading/error -->
+      <div class="page-loader" id="new-listings-loading"><div class="spinner"></div><div>Scanning for new tokens…</div></div>
+      <div class="error-banner hidden" id="new-listings-error" role="alert"></div>
+
+      <!-- New token alert banner (SSE-driven) -->
+      <div id="new-listings-alert" class="hidden" style="background:linear-gradient(135deg,#1a2a1a,#0d1f0d);border:1px solid #00e676;border-radius:var(--radius-sm);padding:.6rem 1rem;margin:.5rem 0;font-size:.83rem;color:#00e676;display:flex;align-items:center;gap:.5rem;cursor:pointer;" onclick="document.getElementById('new-listings-alert').classList.add('hidden');loadNewListings();">
+        <span>🔔</span>
+        <span id="new-listings-alert-text">New tokens detected! Click to refresh.</span>
+      </div>
+
+      <!-- Token grid -->
+      <div id="new-listings-list" class="hidden">
+        <div class="market-header" role="row">
+          <span>#</span>
+          <span>Token</span>
+          <span class="r">Price</span>
+          <span class="r">24h</span>
+          <span class="r hide-mobile">Liquidity</span>
+          <span class="r hide-mobile">Volume 24h</span>
+          <span class="r hide-mobile">Source</span>
+        </div>
+        <div id="new-listings-rows"></div>
+        <div class="market-pagination" id="new-listings-pagination" style="margin-top:.75rem;display:flex;align-items:center;gap:.5rem;justify-content:center;">
+          <button class="btn btn-ghost btn-sm" id="new-listings-prev" disabled>← Prev</button>
+          <span id="new-listings-page-info" style="font-size:.8rem;color:var(--text-2);"></span>
+          <button class="btn btn-ghost btn-sm" id="new-listings-next">Next →</button>
+        </div>
+      </div>
+
+      <div class="hidden" id="new-listings-empty" style="text-align:center;padding:3rem;color:var(--text-2);">
+        🔍 Scanner is warming up — new tokens will appear here shortly.
+      </div>
+    </div>
+
   </div>
 </div>
-
-<!-- ═══════════════════════════════════════════════════
-     PORTFOLIO TAB
      ═══════════════════════════════════════════════════ -->
 <div id="tab-portfolio" class="tab-panel" role="tabpanel">
   <div class="page">

@@ -292,19 +292,42 @@ const PC_SEARCH_TERMS = [
   // DeFi ecosystem
   'MAXI', 'HDRN', 'ICSA', 'TRIO', 'LOAN', 'PHIAT', 'TEAM',
   // DEX / exchange
-  '9MM', '9INCH', 'PITEAS', 'PULSEX',
+  '9MM', '9INCH', 'PITEAS', 'PULSEX', 'PULSEDEX',
   // Stablecoins / bridges
   'USDC', 'USDT', 'DAI', 'WETH', 'WBTC',
   // PulseChain native
   'PLSD', 'PLSB', 'PLSR', 'PLSP', 'PLSF',
   // Community tokens
   'SPARK', 'WATT', 'GENI', 'MINT', 'BRSCO', 'CST',
-  'DECI', 'BEAR', 'PINU', 'Atropa',
+  'DECI', 'BEAR', 'PINU', 'Atropa', 'BEARS',
   // More ecosystem
   'PHEX', 'eHEX', 'PULSE', 'HEX1', 'PDAI', 'pDAI',
   'XEN', 'LUCKY', 'AXIS', 'NOPE', 'GOLD',
   'FIRE', 'PENT', 'MAX', 'MOPS', 'HBURN',
   'PITCH', 'ICETH', 'PWORLD',
+  // Extended PulseChain ecosystem
+  'PCOCK', 'PEPE', 'SHIB', 'DOGE', 'FLOKI',
+  'HEXDC', 'HEXONE', 'HEX2T', 'HDRN', 'HDRNX',
+  'PLSDOG', 'PLSCAT', 'PLSPEPE', 'PLSSHIB',
+  'WPLSX', 'WMAXI', 'MAXIMUS', 'TRIO', 'LUCKY',
+  'PSHARE', 'PBOND', 'PNODE', 'PFARM',
+  'PLSGOD', 'GODPLS', 'PLUTON', 'PLUTO',
+  'PULSEAI', 'PULSEGPT', 'AIBOT', 'ROBOT',
+  'PULSE2', 'HEX369', 'HEXPLUS', 'HEXMAX',
+  'HEXPULSE', 'PLSHEX', 'HEXDAI', 'HEXUSDC',
+  'PULSEDAO', 'PLSDAO', 'PDAO', 'GOVPLS',
+  'STPLS', 'LSTPLS', 'PSTAKE', 'PLSTAKE',
+  'PHIVE', 'PLSHIVE', 'HIVEPLS', 'APLS',
+  'AMPLIFY', 'AMPL', 'ELASTIC', 'REBASE',
+  'EMERGE', 'ARISE', 'NOVEL', 'FRESH',
+  'WPULSE', 'PULSEINU', 'PULSEDOGE', 'PULSESHIB',
+  'CARN', 'CARNIVORE', 'MEAT', 'GRIND',
+  'ZEUS', 'ARES', 'ATHENA', 'POSEIDON',
+  'HYDRA', 'TITAN', 'ATLAS', 'NOVA',
+  'FORGE', 'ANVIL', 'HAMMER', 'CHAIN',
+  'LIQUID', 'FLOW', 'STREAM', 'RIVER',
+  'MOON', 'STAR', 'COMET', 'ORBIT',
+  'FLUX', 'SURGE', 'PULSE369', 'PLS369',
 ];
 
 async function fetchAllPulseChainTokens() {
@@ -387,6 +410,88 @@ async function fetchAllPulseChainTokens() {
       }
     }
   } catch (e) { console.warn('[moralis/top-movers]', e.message); }
+
+  // Strategy 4: GeckoTerminal top pools on PulseChain (free, no auth needed)
+  for (const gtEndpoint of [
+    'https://api.geckoterminal.com/api/v2/networks/pulsechain/pools?page=1&sort=h24_volume_desc',
+    'https://api.geckoterminal.com/api/v2/networks/pulsechain/pools?page=2&sort=h24_volume_desc',
+    'https://api.geckoterminal.com/api/v2/networks/pulsechain/new_pools?page=1',
+  ]) {
+    try {
+      const r = await fetch(gtEndpoint, {
+        headers: { 'Accept': 'application/json; version=20230302', 'User-Agent': 'PulseCentral/1.0' },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      for (const pool of (data?.data || [])) {
+        const attr = pool.attributes || {};
+        const baseToken = pool.relationships?.base_token?.data?.id;
+        const addr = baseToken ? baseToken.replace('pulsechain_', '').toLowerCase() : null;
+        if (!addr || seen.has(addr)) continue;
+        seen.set(addr, {
+          address:           addr,
+          symbol:            attr.name?.split(' / ')[0] || '?',
+          name:              attr.name || '?',
+          logo:              null,
+          priceUsd:          parseFloat(attr.base_token_price_usd || 0) || 0,
+          priceChange24h:    parseFloat(attr.price_change_percentage?.h24 || 0) || 0,
+          volumeUsd24h:      parseFloat(attr.volume_usd?.h24 || 0) || 0,
+          marketCapUsd:      parseFloat(attr.market_cap_usd || 0) || 0,
+          totalLiquidityUsd: parseFloat(attr.reserve_in_usd || 0) || 0,
+          securityScore:     null,
+          isVerified:        false,
+          _gecko:            true,
+        });
+        totalFetched++;
+      }
+    } catch (e) { console.warn('[gecko/pools]', e.message); }
+  }
+
+  // Strategy 5: DexScreener token profiles (recently added profiles = newer tokens)
+  try {
+    const r = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const prof of (Array.isArray(data) ? data : [])) {
+        if (prof.chainId !== 'pulsechain') continue;
+        const addr = (prof.tokenAddress || '').toLowerCase();
+        if (!addr || seen.has(addr)) continue;
+        // Fetch pair data to get price/liquidity
+        try {
+          const pr = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addr}`, {
+            headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(8_000),
+          });
+          if (pr.ok) {
+            const pd = await pr.json();
+            const pairs = (pd.pairs || []).filter(p => p.chainId === 'pulsechain');
+            if (pairs.length > 0) {
+              const best = pairs.reduce((b, p) =>
+                (parseFloat(p.liquidity?.usd||0) > parseFloat(b.liquidity?.usd||0)) ? p : b
+              );
+              seen.set(addr, {
+                address:           addr,
+                symbol:            best.baseToken?.symbol || prof.symbol || '?',
+                name:              best.baseToken?.name || prof.name || '?',
+                logo:              prof.icon || best.info?.imageUrl || null,
+                priceUsd:          parseFloat(best.priceUsd || 0) || 0,
+                priceChange24h:    parseFloat(best.priceChange?.h24 || 0) || 0,
+                volumeUsd24h:      parseFloat(best.volume?.h24 || 0) || 0,
+                marketCapUsd:      parseFloat(best.marketCap || best.fdv || 0) || 0,
+                totalLiquidityUsd: parseFloat(best.liquidity?.usd || 0) || 0,
+                securityScore:     null,
+                isVerified:        false,
+              });
+              totalFetched++;
+            }
+          }
+        } catch { /* skip this token */ }
+      }
+    }
+  } catch (e) { console.warn('[dex/profiles]', e.message); }
 
   // Sort: PLS first, then by total liquidity descending, filter out zero-value tokens
   const PRIORITY = ['0xa1077a294dde1b09bb078844df40758a5d0f9a27', // WPLS
@@ -1102,6 +1207,308 @@ app.get('/api/pulsechain/token-library', async (req, res) => {
 });
 
 
+/* ══════════════════════════════════════════════════════════
+   NEW LISTINGS SCANNER
+   Polls DexScreener + GeckoTerminal for newly listed
+   PulseChain tokens. Runs every 3 minutes and stores the
+   last 500 discovered tokens with first-seen timestamps.
+   ══════════════════════════════════════════════════════════ */
+
+const MAX_NEW_TOKENS = 500;
+let newListingsStore = []; // [{…tokenData, firstSeenAt}]
+const newListingsSeen = new Set(); // pair addresses already captured
+let newListingsLastScan = 0;
+const NEW_LISTINGS_SCAN_INTERVAL = 3 * 60 * 1000; // 3 min
+
+async function scanNewListings() {
+  console.log('[new-listings] Scanning for new PulseChain tokens…');
+  const discovered = [];
+
+  // ── Source 1: DexScreener /latest/dex/tokens/pulsechain ─────────────
+  // Returns pairs sorted by created time desc — pure new listings feed
+  try {
+    const r = await fetch('https://api.dexscreener.com/latest/dex/tokens/pulsechain', {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const p of (data.pairs || [])) {
+        if (p.chainId !== 'pulsechain') continue;
+        const pairAddr = (p.pairAddress || '').toLowerCase();
+        if (!pairAddr || newListingsSeen.has(pairAddr)) continue;
+        newListingsSeen.add(pairAddr);
+        discovered.push(normalizeDexScreenerPair(p));
+      }
+    }
+  } catch (e) { console.warn('[new-listings] DSX tokens/pulsechain:', e.message); }
+
+  // ── Source 2: DexScreener token-boosts (boosted = recently added) ────
+  try {
+    const r = await fetch('https://api.dexscreener.com/token-boosts/latest/v1', {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'PulseCentral/1.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const b of (Array.isArray(data) ? data : [])) {
+        if (b.chainId !== 'pulsechain') continue;
+        const pairAddr = (b.pairAddress || b.tokenAddress || '').toLowerCase();
+        if (!pairAddr || newListingsSeen.has(pairAddr)) continue;
+        newListingsSeen.add(pairAddr);
+        // Enrich via DexScreener pairs endpoint
+        try {
+          const pr = await fetch(`https://api.dexscreener.com/latest/dex/pairs/pulsechain/${b.pairAddress || b.tokenAddress}`, {
+            headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(8_000),
+          });
+          if (pr.ok) {
+            const pd = await pr.json();
+            const pair = (pd.pairs || [])[0] || pd.pair;
+            if (pair) { discovered.push(normalizeDexScreenerPair(pair, b)); continue; }
+          }
+        } catch { /* fallback to raw boost data */ }
+        discovered.push({
+          pairAddress:   b.pairAddress || b.tokenAddress,
+          tokenAddress:  b.tokenAddress,
+          symbol:        b.symbol || '?',
+          name:          b.description || b.symbol || '?',
+          priceUsd:      '0',
+          priceChange24h: 0,
+          volume24h:     0,
+          liquidity:     0,
+          marketCap:     0,
+          logoUrl:       b.icon || b.url || null,
+          pairCreatedAt: b.createdAt || Date.now(),
+          firstSeenAt:   Date.now(),
+          source:        'boost',
+        });
+      }
+    }
+  } catch (e) { console.warn('[new-listings] DSX boosts:', e.message); }
+
+  // ── Source 3: GeckoTerminal new pools on PulseChain ──────────────────
+  try {
+    const r = await fetch('https://api.geckoterminal.com/api/v2/networks/pulsechain/new_pools?page=1', {
+      headers: { 'Accept': 'application/json; version=20230302', 'User-Agent': 'PulseCentral/1.0' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const pool of (data?.data || [])) {
+        const pairAddr = (pool.id || '').replace('pulsechain_', '').toLowerCase();
+        if (!pairAddr || newListingsSeen.has(pairAddr)) continue;
+        newListingsSeen.add(pairAddr);
+        const attr = pool.attributes || {};
+        const baseToken = pool.relationships?.base_token?.data?.id;
+        const tokenAddr = baseToken ? baseToken.replace('pulsechain_', '').toLowerCase() : null;
+        discovered.push({
+          pairAddress:   pairAddr,
+          tokenAddress:  tokenAddr || pairAddr,
+          symbol:        attr.name?.split(' / ')[0] || '?',
+          name:          attr.name || '?',
+          priceUsd:      attr.base_token_price_usd || '0',
+          priceChange24h: parseFloat(attr.price_change_percentage?.h24 || 0),
+          volume24h:     parseFloat(attr.volume_usd?.h24 || 0),
+          liquidity:     parseFloat(attr.reserve_in_usd || 0),
+          marketCap:     parseFloat(attr.market_cap_usd || 0),
+          logoUrl:       null,
+          pairCreatedAt: attr.pool_created_at ? new Date(attr.pool_created_at).getTime() : Date.now(),
+          firstSeenAt:   Date.now(),
+          source:        'geckoterminal',
+        });
+      }
+    }
+  } catch (e) { console.warn('[new-listings] GeckoTerminal new pools:', e.message); }
+
+  // ── Source 4: GeckoTerminal trending pools (page 1 new = freshly trending) ─
+  try {
+    const r = await fetch('https://api.geckoterminal.com/api/v2/networks/pulsechain/trending_pools?page=1', {
+      headers: { 'Accept': 'application/json; version=20230302', 'User-Agent': 'PulseCentral/1.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const pool of (data?.data || [])) {
+        const pairAddr = (pool.id || '').replace('pulsechain_', '').toLowerCase();
+        if (!pairAddr || newListingsSeen.has(pairAddr)) continue;
+        newListingsSeen.add(pairAddr);
+        const attr = pool.attributes || {};
+        const baseToken = pool.relationships?.base_token?.data?.id;
+        const tokenAddr = baseToken ? baseToken.replace('pulsechain_', '').toLowerCase() : null;
+        discovered.push({
+          pairAddress:   pairAddr,
+          tokenAddress:  tokenAddr || pairAddr,
+          symbol:        attr.name?.split(' / ')[0] || '?',
+          name:          attr.name || '?',
+          priceUsd:      attr.base_token_price_usd || '0',
+          priceChange24h: parseFloat(attr.price_change_percentage?.h24 || 0),
+          volume24h:     parseFloat(attr.volume_usd?.h24 || 0),
+          liquidity:     parseFloat(attr.reserve_in_usd || 0),
+          marketCap:     parseFloat(attr.market_cap_usd || 0),
+          logoUrl:       null,
+          pairCreatedAt: attr.pool_created_at ? new Date(attr.pool_created_at).getTime() : Date.now(),
+          firstSeenAt:   Date.now(),
+          source:        'gecko_trending',
+        });
+      }
+    }
+  } catch (e) { console.warn('[new-listings] GeckoTerminal trending:', e.message); }
+
+  // ── Source 5: Moralis top-gainers on PulseChain (new tokens often spike) ─
+  try {
+    const url = new URL(`${MORALIS_BASE}/market-data/erc20s/top-movers`);
+    url.searchParams.set('chain', PULSECHAIN_ID);
+    const r = await fetch(url.toString(), {
+      headers: { 'X-API-Key': MORALIS_KEY, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      for (const tok of (data?.gainers || [])) {
+        const addr = (tok.tokenAddress || tok.token_address || '').toLowerCase();
+        if (!addr || newListingsSeen.has(`moralis:${addr}`)) continue;
+        // Only add if not already in our store by token address
+        const alreadyStored = newListingsStore.some(t => t.tokenAddress === addr);
+        if (alreadyStored) continue;
+        newListingsSeen.add(`moralis:${addr}`);
+        discovered.push({
+          pairAddress:   null,
+          tokenAddress:  addr,
+          symbol:        tok.symbol || '?',
+          name:          tok.name || tok.symbol || '?',
+          priceUsd:      String(tok.usdPrice || tok.usd_price || 0),
+          priceChange24h: parseFloat(tok.usdPricePercentChange?.oneDay || tok.price_24h_percent_change || 0),
+          volume24h:     parseFloat(tok.volumeUsd?.oneDay || 0),
+          liquidity:     parseFloat(tok.totalLiquidityUsd || 0),
+          marketCap:     parseFloat(tok.marketCap || tok.market_cap_usd || 0),
+          logoUrl:       tok.logo || tok.thumbnail || null,
+          pairCreatedAt: Date.now(),
+          firstSeenAt:   Date.now(),
+          source:        'moralis_gainer',
+        });
+      }
+    }
+  } catch (e) { console.warn('[new-listings] Moralis gainers:', e.message); }
+
+  if (discovered.length > 0) {
+    // Prepend new tokens, deduplicate, cap at MAX_NEW_TOKENS
+    newListingsStore = [
+      ...discovered,
+      ...newListingsStore,
+    ]
+      .filter((t, idx, arr) =>
+        arr.findIndex(x =>
+          (x.pairAddress && x.pairAddress === t.pairAddress) ||
+          (x.tokenAddress && x.tokenAddress === t.tokenAddress)
+        ) === idx
+      )
+      .slice(0, MAX_NEW_TOKENS);
+    console.log(`[new-listings] +${discovered.length} discovered, store=${newListingsStore.length}`);
+  }
+
+  // Also merge into token library so they show up in markets
+  for (const tok of discovered) {
+    if (!tok.tokenAddress) continue;
+    const addr = tok.tokenAddress.toLowerCase();
+    if (!pulseTokenLibrary.has(addr)) {
+      pulseTokenLibrary.set(addr, {
+        address:           addr,
+        symbol:            tok.symbol,
+        name:              tok.name,
+        logo:              tok.logoUrl || null,
+        priceUsd:          parseFloat(tok.priceUsd || 0) || 0,
+        priceChange24h:    tok.priceChange24h || 0,
+        volumeUsd24h:      tok.volume24h || 0,
+        marketCapUsd:      tok.marketCap || 0,
+        totalLiquidityUsd: tok.liquidity || 0,
+        securityScore:     null,
+        isVerified:        false,
+        _newListing:       true,
+      });
+    }
+  }
+
+  newListingsLastScan = Date.now();
+}
+
+function normalizeDexScreenerPair(p, boostData = null) {
+  return {
+    pairAddress:   (p.pairAddress || '').toLowerCase(),
+    tokenAddress:  (p.baseToken?.address || '').toLowerCase(),
+    symbol:        p.baseToken?.symbol || '?',
+    name:          p.baseToken?.name || p.baseToken?.symbol || '?',
+    priceUsd:      p.priceUsd || '0',
+    priceChange24h: parseFloat(p.priceChange?.h24 || 0),
+    volume24h:     parseFloat(p.volume?.h24 || 0),
+    liquidity:     parseFloat(p.liquidity?.usd || 0),
+    marketCap:     parseFloat(p.marketCap || p.fdv || 0),
+    logoUrl:       boostData?.icon || p.info?.imageUrl ||
+                   `https://dd.dexscreener.com/ds-data/tokens/pulsechain/${(p.baseToken?.address||'').toLowerCase()}.png`,
+    pairCreatedAt: p.pairCreatedAt || Date.now(),
+    firstSeenAt:   Date.now(),
+    source:        'dexscreener',
+    dexId:         p.dexId || null,
+    quoteSymbol:   p.quoteToken?.symbol || '',
+    txns24h:       (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0),
+  };
+}
+
+// Start scanning immediately and then every 3 minutes
+setTimeout(() => scanNewListings().catch(e => console.warn('[new-listings] initial scan:', e.message)), 12_000);
+setInterval(() => scanNewListings().catch(e => console.warn('[new-listings] scan error:', e.message)), NEW_LISTINGS_SCAN_INTERVAL);
+
+app.get('/api/pulsechain/new-listings', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const page     = parseInt(req.query.page || '1', 10);
+  const pageSize = parseInt(req.query.pageSize || '50', 10);
+  const minLiq   = parseFloat(req.query.minLiq || '0');
+  const sortBy   = req.query.sortBy || 'newest'; // newest | volume | liquidity | change
+
+  let tokens = newListingsStore.filter(t =>
+    !t.tokenAddress || !DENYLIST.has(t.tokenAddress.toLowerCase())
+  );
+
+  if (minLiq > 0) tokens = tokens.filter(t => (t.liquidity || 0) >= minLiq);
+
+  tokens.sort((a, b) => {
+    if (sortBy === 'volume')    return (b.volume24h || 0) - (a.volume24h || 0);
+    if (sortBy === 'liquidity') return (b.liquidity || 0) - (a.liquidity || 0);
+    if (sortBy === 'change')    return (b.priceChange24h || 0) - (a.priceChange24h || 0);
+    return (b.firstSeenAt || 0) - (a.firstSeenAt || 0); // newest first
+  });
+
+  const total = tokens.length;
+  const slice = tokens.slice((page - 1) * pageSize, page * pageSize);
+  res.json({ total, page, pageSize, lastScan: newListingsLastScan, tokens: slice });
+});
+
+// SSE endpoint — clients subscribe and get pushed new token events
+const newListingsSseClients = new Set();
+
+app.get('/api/pulsechain/new-listings/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  // Send current snapshot immediately
+  res.write(`data: ${JSON.stringify({ type: 'snapshot', tokens: newListingsStore.slice(0, 50), lastScan: newListingsLastScan })}\n\n`);
+
+  newListingsSseClients.add(res);
+  req.on('close', () => newListingsSseClients.delete(res));
+});
+
+// Broadcast to SSE clients after each scan
+const _origScanNewListings = scanNewListings;
+// Override already-defined scan — broadcast on each completion
+setInterval(async () => {
+  if (newListingsSseClients.size === 0) return;
+  const payload = JSON.stringify({ type: 'update', tokens: newListingsStore.slice(0, 50), lastScan: newListingsLastScan });
+  for (const client of newListingsSseClients) {
+    try { client.write(`data: ${payload}\n\n`); }
+    catch { newListingsSseClients.delete(client); }
+  }
+}, NEW_LISTINGS_SCAN_INTERVAL);
 
 
 /* ══════════════════════════════════════════════════════════

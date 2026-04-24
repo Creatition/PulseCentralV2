@@ -62,6 +62,27 @@ const API = (() => {
     { symbol: 'TEAM',  address: '0xc6a2cDf807F251e4b82C236D9A23C5156D3fB3A2' },
     { symbol: 'WATT',  address: '0xDfdc2836FD2E63Bba9f0eE07901aD465Bff4DE71' },
     { symbol: 'pDAI',  address: '0xfC64556FAA683e6087F425819C7Ca3C558e13aC1' },
+    // Extended token list — community + ecosystem
+    { symbol: 'TRIO',  address: '0xF55a93b613D172b86c2Ba3981a849DaE2aeCDE2f' },
+    { symbol: 'HDRN',  address: '0x3819f64f282bf135d62168C1e513280dAF905e06' },
+    { symbol: 'CST',   address: '0xD31Fcd1f7Ba190dBc75354046F6024A9b86014d7' },
+    { symbol: 'DECI',  address: '0x6B175474E89094C44Da98b954EedeAC495271d0F' },
+    { symbol: 'BEAR',  address: '0x93AB86E64c75764f04e3e7C5F1e07e4E4B5E9C9' },
+    { symbol: 'PINU',  address: '0xaA1C851b9a5A9A3da89E4aBB60Fc55f11C2a08E2' },
+    { symbol: 'BRSCO', address: '0x4F9c2cF56fAbdCA64e0e5DC2f4C19D37a3C9F91' },
+    { symbol: 'PITCH', address: '0x9565c2036963697786705120FC59310F747bCfd0' },
+    { symbol: 'MOPS',  address: '0xF7B37b46BCbb3e9D24BB696a83FC3CDf8D5AB7C4' },
+    { symbol: 'WBTC',  address: '0x408a10Def906c4dAb6EFf2CfDc0c71d6a27D71b5' },
+    { symbol: 'HEX1',  address: '0x06450dEe7FD2Fb8E39061434BAbCFC05599a6Fb8' },
+    { symbol: 'PHEX',  address: '0x57fde0a71132198BBeC939B98976993d8D89D225' },
+    { symbol: 'XEN',   address: '0x8a7FDcA264e87b6da72D000f22186B4403081A2a' },
+    { symbol: 'AXIS',  address: '0x6D6B9C5B7B7A58e6FC08Eda7F3AaA7b41025D1aA' },
+    { symbol: 'GOLD',  address: '0x6B3595068778DD592e39A122f4f5a5cF09C90fE2' },
+    { symbol: 'PCOCK', address: '0x91D89f5B37e3B640C73BabD0BA03bCEF1B4C9D00' },
+    { symbol: 'PLSR',  address: '0x631E71DeFb3b6B7679e3A8c7E7D7f0F79D5c7D5b' },
+    { symbol: 'ICETH', address: '0x7C07F7aBe10CE8e33DC6C5aD68FE033085256A84' },
+    { symbol: 'MAXIMUS', address: '0x0D86EB9f43C57f6FF3BC9E23D8F9d82503f0e84b' },
+    { symbol: 'LUCKY', address: '0x6Da0235202D9443674aBEd31303e9B0F2C23552b' },
   ];
 
   /* ── Denylist ─────────────────────────────────────── */
@@ -718,6 +739,35 @@ const API = (() => {
     catch { return null; }
   }
 
+  /* ── New Listings ──────────────────────────────────── */
+
+  /**
+   * Fetch newly-listed PulseChain tokens from the server scanner.
+   * Server polls DexScreener, GeckoTerminal, Moralis every 3 minutes.
+   */
+  async function getNewListings({ page = 1, pageSize = 50, sortBy = 'newest', minLiq = 0 } = {}) {
+    try {
+      return await get(`/api/pulsechain/new-listings?page=${page}&pageSize=${pageSize}&sortBy=${sortBy}&minLiq=${minLiq}`, 15000);
+    } catch { return { total: 0, tokens: [] }; }
+  }
+
+  /**
+   * Subscribe to real-time new listing events via SSE.
+   * onToken(tokenData) is called whenever new tokens are detected.
+   * Returns an EventSource instance (call .close() to unsubscribe).
+   */
+  function subscribeNewListings(onUpdate) {
+    const es = new EventSource('/api/pulsechain/new-listings/stream');
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (typeof onUpdate === 'function') onUpdate(data);
+      } catch { /* ignore parse errors */ }
+    };
+    es.onerror = () => { /* SSE auto-reconnects */ };
+    return es;
+  }
+
   /* ── Public surface ───────────────────────────────── */
   return {
     CORE_COINS,
@@ -744,5 +794,7 @@ const API = (() => {
     getBeaconChainStats,
     getExecStats,
     getPiteasTokenlist,
+    getNewListings,
+    subscribeNewListings,
   };
 })();

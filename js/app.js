@@ -418,9 +418,10 @@ function switchMarketsSubtab(subtab) {
   document.querySelectorAll('[data-subtab]').forEach(btn => {
     btn.classList.toggle('active-sub', btn.dataset.subtab === subtab);
   });
-  if (subtab === 'crypto100')   loadCrypto100();
-  if (subtab === 'commodities') loadCommodities();
-  if (subtab === 'pump')        loadPumpTab();
+  if (subtab === 'crypto100')     loadCrypto100();
+  if (subtab === 'commodities')   loadCommodities();
+  if (subtab === 'pump')          loadPumpTab();
+  if (subtab === 'new-listings')  loadNewListings();
 }
 window.switchMarketsSubtab = switchMarketsSubtab;
 
@@ -1528,6 +1529,214 @@ async function loadCommodities(forceRefresh = false) {
 }
 
 $('commodities-refresh-btn')?.addEventListener('click', () => loadCommodities(true));
+
+/* ══════════════════════════════════════════════════════
+   NEW LISTINGS TAB
+   Auto-scans DexScreener + GeckoTerminal + Moralis every
+   3 minutes via SSE; also poll-able on demand.
+   ══════════════════════════════════════════════════════ */
+
+let newListingsPage      = 1;
+let newListingsTotal     = 0;
+const NEW_LISTINGS_SIZE  = 50;
+let newListingsSse       = null;
+let newListingsLoaded    = false;
+let newListingsPendingUpdate = false;
+
+async function loadNewListings(forceRefresh = false) {
+  if (newListingsLoaded && !forceRefresh) return;
+  newListingsLoaded = true;
+
+  const loading = $('new-listings-loading');
+  const error   = $('new-listings-error');
+  const list    = $('new-listings-list');
+  const empty   = $('new-listings-empty');
+  const count   = $('new-listings-count');
+
+  show(loading); hide(error); hide(list); hide(empty);
+
+  try {
+    const sortBy  = $('new-listings-sort')?.value || 'newest';
+    const minLiq  = $('new-listings-minliq')?.value || '0';
+    const data    = await API.getNewListings({ page: newListingsPage, pageSize: NEW_LISTINGS_SIZE, sortBy, minLiq: parseFloat(minLiq) });
+
+    newListingsTotal = data.total || 0;
+    if (count) count.textContent = `${newListingsTotal} tokens discovered`;
+
+    // Update last scan time
+    const scanEl = $('new-listings-scan-time');
+    if (scanEl && data.lastScan) {
+      const ago = Math.round((Date.now() - data.lastScan) / 1000);
+      scanEl.textContent = ago < 60 ? `Scanned ${ago}s ago` : `Scanned ${Math.round(ago/60)}m ago`;
+    }
+
+    if (!data.tokens || data.tokens.length === 0) {
+      hide(loading); show(empty);
+    } else {
+      hide(loading); show(list);
+      renderNewListings(data.tokens, newListingsPage, newListingsTotal);
+    }
+  } catch (e) {
+    hide(loading);
+    if (error) { error.textContent = `Failed to load new listings: ${e.message}`; show(error); }
+  }
+}
+
+function renderNewListings(tokens, page, total) {
+  const rows = $('new-listings-rows');
+  if (!rows) return;
+  rows.innerHTML = '';
+
+  const pageSize  = NEW_LISTINGS_SIZE;
+  const totalPages = Math.ceil(total / pageSize);
+  const offset    = (page - 1) * pageSize;
+
+  tokens.forEach((tok, i) => {
+    const row = document.createElement('div');
+    row.className = 'new-listing-row';
+
+    const price = parseFloat(tok.priceUsd || 0);
+    const change = parseFloat(tok.priceChange24h || 0);
+    const liq    = parseFloat(tok.liquidity || tok.totalLiquidityUsd || 0);
+    const vol    = parseFloat(tok.volume24h || tok.volumeUsd24h || 0);
+    const changeColor = change > 0 ? '#00e676' : change < 0 ? '#ff5252' : 'var(--text-2)';
+
+    const sourceLabel = {
+      dexscreener:   'DSX',
+      boost:         'Boost',
+      geckoterminal: 'Gecko',
+      gecko_trending:'Gecko',
+      moralis_gainer:'Moralis',
+    }[tok.source] || tok.source || '?';
+
+    const sourceBadgeClass = {
+      boost:         'boost',
+      geckoterminal: 'gecko',
+      gecko_trending:'gecko',
+      moralis_gainer:'moralis',
+    }[tok.source] || '';
+
+    // Age since first seen
+    const ageMs  = Date.now() - (tok.firstSeenAt || Date.now());
+    const ageMins = Math.round(ageMs / 60000);
+    const ageStr  = ageMins < 60 ? `${ageMins}m ago` : `${Math.round(ageMins/60)}h ago`;
+
+    const logoUrl = tok.logoUrl ||
+      (tok.tokenAddress ? `https://dd.dexscreener.com/ds-data/tokens/pulsechain/${tok.tokenAddress.toLowerCase()}.png` : null);
+
+    const pairLink = tok.pairAddress
+      ? `https://dexscreener.com/pulsechain/${tok.pairAddress}`
+      : tok.tokenAddress
+      ? `https://dexscreener.com/pulsechain/${tok.tokenAddress}`
+      : '#';
+
+    row.innerHTML = `
+      <span style="color:var(--text-3);font-size:.75rem;">${offset + i + 1}</span>
+      <div class="new-listing-token-info">
+        ${logoUrl ? `<img class="new-listing-token-logo" src="${logoUrl}" alt="${tok.symbol}" onerror="this.style.display='none'">` : `<div class="new-listing-token-logo" style="display:flex;align-items:center;justify-content:center;font-size:.9rem;background:var(--surface-2);">🪙</div>`}
+        <div class="new-listing-token-name">
+          <span class="new-listing-symbol">${tok.symbol}</span>
+          <span class="new-listing-badge ${sourceBadgeClass}">${ageStr}</span>
+          <span class="new-listing-name">${tok.name}</span>
+        </div>
+      </div>
+      <span class="r">${price > 0 ? formatPrice(price) : '—'}</span>
+      <span class="r" style="color:${changeColor};">${change !== 0 ? (change > 0 ? '+' : '') + change.toFixed(2) + '%' : '—'}</span>
+      <span class="r hide-mobile">${liq > 0 ? '$' + formatCompact(liq) : '—'}</span>
+      <span class="r hide-mobile">${vol > 0 ? '$' + formatCompact(vol) : '—'}</span>
+      <span class="r hide-mobile"><span class="nl-source-pill">${sourceLabel}</span></span>
+    `;
+
+    row.addEventListener('click', () => {
+      if (pairLink !== '#') window.open(pairLink, '_blank', 'noopener');
+    });
+    row.style.cursor = 'pointer';
+    row.title = `Open ${tok.symbol} on DexScreener`;
+
+    rows.appendChild(row);
+  });
+
+  // Pagination
+  const prevBtn  = $('new-listings-prev');
+  const nextBtn  = $('new-listings-next');
+  const pageInfo = $('new-listings-page-info');
+  if (prevBtn) prevBtn.disabled = page <= 1;
+  if (nextBtn) nextBtn.disabled = page >= totalPages;
+  if (pageInfo) pageInfo.textContent = `Page ${page} of ${totalPages || 1} · ${total} tokens`;
+}
+
+// Filter/sort controls
+['new-listings-sort', 'new-listings-minliq'].forEach(id => {
+  $(id)?.addEventListener('change', () => {
+    newListingsPage = 1;
+    newListingsLoaded = false;
+    loadNewListings(true);
+  });
+});
+
+// Pagination
+$('new-listings-prev')?.addEventListener('click', () => {
+  if (newListingsPage > 1) { newListingsPage--; newListingsLoaded = false; loadNewListings(true); }
+});
+$('new-listings-next')?.addEventListener('click', () => {
+  const totalPages = Math.ceil(newListingsTotal / NEW_LISTINGS_SIZE);
+  if (newListingsPage < totalPages) { newListingsPage++; newListingsLoaded = false; loadNewListings(true); }
+});
+
+$('new-listings-refresh-btn')?.addEventListener('click', () => {
+  newListingsLoaded = false;
+  $('new-listings-alert')?.classList.add('hidden');
+  loadNewListings(true);
+});
+
+// SSE subscription — show alert when new tokens arrive
+function startNewListingsSse() {
+  if (newListingsSse) return; // already connected
+  try {
+    newListingsSse = API.subscribeNewListings((data) => {
+      if (data.type === 'update' && data.tokens) {
+        // Show alert banner if currently on the new-listings tab
+        if (activeMarketsSubtab === 'new-listings') {
+          const alertEl = $('new-listings-alert');
+          const alertText = $('new-listings-alert-text');
+          if (alertEl && alertText) {
+            alertText.textContent = `🔔 New tokens detected! Click to refresh. (${data.tokens.length} found)`;
+            alertEl.classList.remove('hidden');
+          }
+        }
+        // Update scan time indicator
+        const scanEl = $('new-listings-scan-time');
+        if (scanEl && data.lastScan) {
+          scanEl.textContent = 'Just scanned';
+        }
+      }
+    });
+  } catch { /* SSE not supported */ }
+}
+
+// Start SSE after page load
+setTimeout(() => startNewListingsSse(), 5000);
+
+// Utility: format compact numbers (1.2K, 4.5M, etc.)
+function formatCompact(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toFixed(0);
+}
+
+// Utility: format token price with appropriate decimals
+function formatPrice(p) {
+  if (p === 0) return '$0';
+  if (p >= 1000)  return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (p >= 1)     return '$' + p.toFixed(4);
+  if (p >= 0.001) return '$' + p.toFixed(6);
+  // Very small prices: show significant digits
+  const s = p.toExponential(3);
+  return '$' + s;
+}
+
+window.loadNewListings = loadNewListings;
 
 function renderCommodities(data) {
   const list = $('commodities-list');
@@ -3154,9 +3363,10 @@ async function loadModalWhales() {
     document.querySelectorAll('[data-subtab]').forEach(btn => {
       btn.classList.toggle('active-sub', btn.dataset.subtab === lastMarketsSub);
     });
-    if (lastMarketsSub === 'crypto100')   loadCrypto100();
+    if (lastMarketsSub === 'crypto100')     loadCrypto100();
     else if (lastMarketsSub === 'commodities') loadCommodities();
-    else if (lastMarketsSub === 'pump')   loadPumpTab();
+    else if (lastMarketsSub === 'pump')     loadPumpTab();
+    else if (lastMarketsSub === 'new-listings') loadNewListings();
   } else {
     switchTab(lastTab);
   }
