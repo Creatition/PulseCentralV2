@@ -118,9 +118,203 @@ app.get('/api/gecko/*', (req, res) => {
   });
 });
 
-// ── BlockScout v1 (confirmed working for balances/token lists) ─
-app.get('/api/scan', (req, res) => {
-  proxy(res, `https://api.scan.pulsechain.com/api${qs(req)}`);
+// ── BlockScout v1 — with retry on 429 and longer cache ─
+// Rate limit: BlockScout public API allows ~1 req/sec. Cache for 60s to avoid hammering.
+const SCAN_CACHE_TTL = 60_000; // 60s cache for scan results
+
+app.get('/api/scan', async (req, res) => {
+  const url = `https://api.scan.pulsechain.com/api${qs(req)}`;
+  const cacheKey = url;
+
+  // Use longer TTL for scan endpoints
+  const cached = getCached(cacheKey, SCAN_CACHE_TTL);
+  if (cached) return res.json(cached);
+
+  // Retry up to 3 times with backoff on 429
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (r.status === 429) {
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+          continue;
+        }
+        return res.status(429).json({ error: 'BlockScout rate limited. Please try again in a moment.' });
+      }
+      if (!r.ok) return res.status(r.status).json({ error: `Upstream HTTP ${r.status}` });
+      const data = await r.json();
+      setCached(cacheKey, data);
+      return res.json(data);
+    } catch (err) {
+      if (attempt === 3) {
+        console.error('[scan]', url, err.message);
+        return res.status(502).json({ error: 'Proxy failed', detail: err.message });
+      }
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+  }
+});
+
+/* ── Unified Portfolio endpoint ───────────────────────────
+   Single call returns { plsBalance, tokens } for a wallet.
+   Priority chain:
+     1. Moralis /wallets/:addr/tokens (includes PLS native + ERC20s with prices)
+     2. BlockScout v2 /addresses/:addr/token-balances + /addresses/:addr (native balance)
+     3. BlockScout v1 tokenlist + balance (last resort)
+   Cached 60s per address to prevent hammering.
+   ─────────────────────────────────────────────────────────── */
+app.get('/api/portfolio/:address', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  const addr = sanitise(req.params.address);
+  if (!addr || !/^0x[0-9a-f]{40}$/i.test(addr)) return res.status(400).json({ error: 'Invalid address' });
+
+  const cacheKey = `portfolio:${addr.toLowerCase()}`;
+  const cached = getCached(cacheKey, SCAN_CACHE_TTL);
+  if (cached) return res.json(cached);
+
+  // ── Strategy 1: Moralis (best — returns native + ERC20 + prices in one call) ──
+  try {
+    const data = await moralisFetch(`/wallets/${addr}/tokens`, {
+      chain: PULSECHAIN_ID,
+      exclude_spam: 'true',
+      exclude_unverified_contracts: 'false',
+    });
+
+    if (data && Array.isArray(data.result)) {
+      // Moralis includes native PLS in result with token_address = null or as "native"
+      let plsBalance = 0;
+      const tokens = [];
+
+      for (const t of data.result) {
+        const isNative = !t.token_address || t.token_address === '0x0000000000000000000000000000000000000000' || t.native_token === true;
+        const decimals = Number(t.decimals || 18);
+        const rawBal   = BigInt(t.balance || '0');
+        const balance  = Number(rawBal) / Math.pow(10, decimals);
+
+        if (isNative) {
+          plsBalance = balance;
+        } else {
+          const priceUsd = t.usd_price != null ? Number(t.usd_price) : null;
+          const valueUsd = t.usd_value != null ? Number(t.usd_value) : (priceUsd != null ? priceUsd * balance : null);
+          tokens.push({
+            symbol:          t.symbol || '?',
+            name:            t.name   || t.symbol || '?',
+            balance,
+            decimals,
+            contractAddress: t.token_address,
+            logoUrl:         t.logo || t.thumbnail || null,
+            priceUsd,
+            valueUsd,
+            source:          'moralis',
+          });
+        }
+      }
+
+      // If native PLS balance came back as 0, also fetch it explicitly
+      if (plsBalance === 0) {
+        try {
+          const nativeData = await moralisFetch(`/wallets/${addr}/balance`, { chain: PULSECHAIN_ID });
+          if (nativeData?.balance) {
+            plsBalance = Number(BigInt(nativeData.balance)) / 1e18;
+          }
+        } catch { /* leave as 0 */ }
+      }
+
+      const result = { plsBalance, tokens, source: 'moralis' };
+      setCached(cacheKey, result);
+      return res.json(result);
+    }
+  } catch (e) {
+    console.warn('[portfolio/moralis]', e.message);
+  }
+
+  // ── Strategy 2: BlockScout v2 ────────────────────────────────────────────────
+  try {
+    const [addressData, tokenBalances] = await Promise.all([
+      fetch(`https://scan.pulsechain.com/api/v2/addresses/${addr}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(12_000),
+      }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://scan.pulsechain.com/api/v2/addresses/${addr}/token-balances`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(12_000),
+      }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+
+    const plsBalance = addressData?.coin_balance
+      ? Number(BigInt(addressData.coin_balance)) / 1e18
+      : 0;
+
+    const tokens = (Array.isArray(tokenBalances) ? tokenBalances : [])
+      .filter(t => t.token?.type === 'ERC-20')
+      .map(t => {
+        const decimals = Number(t.token?.decimals || 18);
+        const rawBal   = BigInt(t.value || '0');
+        const balance  = Number(rawBal) / Math.pow(10, decimals);
+        return {
+          symbol:          t.token?.symbol  || '?',
+          name:            t.token?.name    || t.token?.symbol || '?',
+          balance,
+          decimals,
+          contractAddress: t.token?.address || null,
+          logoUrl:         t.token?.icon_url || null,
+          priceUsd:        null,
+          valueUsd:        null,
+          source:          'blockscout_v2',
+        };
+      })
+      .filter(t => t.balance > 0 && t.contractAddress);
+
+    if (plsBalance > 0 || tokens.length > 0) {
+      const result = { plsBalance, tokens, source: 'blockscout_v2' };
+      setCached(cacheKey, result);
+      return res.json(result);
+    }
+  } catch (e) {
+    console.warn('[portfolio/blockscout_v2]', e.message);
+  }
+
+  // ── Strategy 3: BlockScout v1 (last resort, rate-limited) ────────────────────
+  try {
+    const [balData, tokenData] = await Promise.all([
+      fetch(`https://api.scan.pulsechain.com/api?module=account&action=balance&address=${addr}&tag=latest`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(12_000),
+      }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://api.scan.pulsechain.com/api?module=account&action=tokenlist&address=${addr}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PulseCentral/1.0)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+
+    const plsBalance = (balData?.status === '1' && balData?.result)
+      ? Number(balData.result) / 1e18
+      : 0;
+
+    const tokens = (tokenData?.status === '1' ? tokenData.result || [] : [])
+      .map(t => ({
+        symbol:          t.symbol  || '?',
+        name:            t.name    || t.symbol || '?',
+        balance:         Number(t.balance) / Math.pow(10, Number(t.decimals || 18)),
+        decimals:        Number(t.decimals || 18),
+        contractAddress: t.contractAddress,
+        logoUrl:         null,
+        priceUsd:        null,
+        valueUsd:        null,
+        source:          'blockscout_v1',
+      }))
+      .filter(t => t.balance > 0 && t.contractAddress);
+
+    const result = { plsBalance, tokens, source: 'blockscout_v1' };
+    setCached(cacheKey, result);
+    return res.json(result);
+  } catch (e) {
+    console.error('[portfolio/blockscout_v1]', e.message);
+    return res.status(502).json({ error: `Failed to load portfolio data: ${e.message}` });
+  }
 });
 
 // ── BlockScout v2 token metadata + transfers ──────────

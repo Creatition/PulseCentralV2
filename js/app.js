@@ -1862,11 +1862,14 @@ async function loadPortfolio(address) {
   show($('portfolio-empty'));
 
   try {
-    const [plsBal, tokens, plsPrice] = await Promise.all([
-      API.getPlsBalance(address),
-      API.getTokenList(address),
+    // Single unified call → Moralis → BlockScout v2 → BlockScout v1
+    const [portfolio, plsPrice] = await Promise.all([
+      API.getPortfolio(address),
       API.getPlsPrice(),
     ]);
+
+    const plsBal = portfolio.plsBalance ?? 0;
+    const tokens = portfolio.tokens    ?? [];
 
     const active = tokens.filter(t => t.balance > 0);
     const addrs  = active.map(t => t.contractAddress);
@@ -1948,7 +1951,7 @@ async function loadGroupPortfolio(group) {
   try {
     const [results, plsPrice] = await Promise.all([
       Promise.all(
-        group.addresses.map(({ addr }) => Promise.all([API.getPlsBalance(addr), API.getTokenList(addr)]))
+        group.addresses.map(({ addr }) => API.getPortfolio(addr).then(p => [p.plsBalance ?? 0, p.tokens ?? []]))
       ),
       API.getPlsPrice(),
     ]);

@@ -451,14 +451,37 @@ const API = (() => {
 
   /* ── Portfolio ────────────────────────────────────── */
 
+  /**
+   * Unified portfolio fetch — single server call returns both
+   * PLS balance and token list. Uses Moralis → BlockScout v2
+   * → BlockScout v1 fallback chain server-side to avoid
+   * client-side 429 errors on BlockScout.
+   */
+  async function getPortfolio(addr) {
+    const data = await get(`/api/portfolio/${addr}`, 25000);
+    return data; // { plsBalance, tokens, source }
+  }
+
   async function getPlsBalance(addr) {
+    // Try unified endpoint first
+    try {
+      const data = await get(`/api/portfolio/${addr}`, 25000);
+      if (data && typeof data.plsBalance === 'number') return data.plsBalance;
+    } catch { /* fall through */ }
+    // Direct BlockScout fallback
     const data = await get(`${SCAN}?module=account&action=balance&address=${addr}&tag=latest`);
     if (data.status !== '1') throw new Error(data.message || 'Balance fetch failed');
     return Number(data.result) / 1e18;
   }
 
   async function getTokenList(addr) {
-    // Try Moralis first — returns rich data with logos, prices, metadata
+    // Try unified endpoint first (Moralis → BlockScout chain, no 429s)
+    try {
+      const data = await get(`/api/portfolio/${addr}`, 25000);
+      if (data && Array.isArray(data.tokens)) return data.tokens;
+    } catch { /* fall through to legacy paths */ }
+
+    // Legacy: Moralis direct
     try {
       const moralis = await get(`/api/moralis/wallet/${addr}/tokens`, 20000);
       if (moralis && !moralis.error && Array.isArray(moralis.result)) {
@@ -468,8 +491,6 @@ const API = (() => {
             const decimals = Number(t.decimals || 18);
             const rawBal   = BigInt(t.balance || '0');
             const balance  = Number(rawBal) / Math.pow(10, decimals);
-            // Moralis returns usd_price as null for some tokens — keep null so
-            // the portfolio enrichment step can fill it in via DexScreener pairs.
             const priceUsd = (t.usd_price != null) ? Number(t.usd_price) : null;
             const valueUsd = (t.usd_value != null) ? Number(t.usd_value)
                            : (priceUsd != null)     ? priceUsd * balance
@@ -490,7 +511,7 @@ const API = (() => {
       }
     } catch (e) { console.warn('[getTokenList] Moralis failed:', e.message); }
 
-    // Fallback: BlockScout (no price data — portfolio will enrich via DexScreener)
+    // Last resort: BlockScout v1
     const data = await get(`${SCAN}?module=account&action=tokenlist&address=${addr}`);
     if (data.status !== '1') {
       if (data.message === 'No tokens found') return [];
@@ -753,6 +774,7 @@ const API = (() => {
     getTrendingPairs,
     getPlsBalance,
     getTokenList,
+    getPortfolio,
     getPlsPrice,
     getMoralisTokenPrices,
     getTotalSupply,
