@@ -1648,9 +1648,10 @@ async function loadPortfolio(address) {
   show($('portfolio-empty'));
 
   try {
-    const [plsBal, tokens] = await Promise.all([
+    const [plsBal, tokens, plsPrice] = await Promise.all([
       API.getPlsBalance(address),
       API.getTokenList(address),
+      API.getPlsPrice(),
     ]);
 
     const active = tokens.filter(t => t.balance > 0);
@@ -1663,27 +1664,27 @@ async function loadPortfolio(address) {
     ]);
 
     const enriched = active.map((t, i) => {
-      const pair  = pairMap.get(t.contractAddress.toLowerCase());
-      // Use Moralis price if available (from getTokenList), fall back to DexScreener pair price
+      const pair = pairMap.get(t.contractAddress.toLowerCase());
+      // Price resolution: Moralis usd_price → DexScreener pair → 0
       const price = (t.source === 'moralis' && t.priceUsd != null)
         ? t.priceUsd
-        : Number(pair?.priceUsd || 0);
+        : Number(pair && pair.priceUsd || 0);
       const value = (t.source === 'moralis' && t.valueUsd != null)
         ? t.valueUsd
         : price * t.balance;
-      // Use Moralis logo if available, fall back to DexScreener logo
+      // Logo resolution: Moralis → DexScreener → DexScreener CDN fallback
       const logoUrl = t.logoUrl || API.logoUrl(pair, t.contractAddress);
-      const pairAddr = pair?.pairAddress || null;
+      const pairAddr = pair && pair.pairAddress || null;
       const rawSup = supplies[i].status === 'fulfilled' ? supplies[i].value : null;
       const totalSup = rawSup ? Number(rawSup) / Math.pow(10, t.decimals) : null;
       const supplyPct = totalSup && totalSup > 0 ? (t.balance / totalSup) * 100 : null;
-      return { ...t, price, change24h: Number(pair?.priceChange?.h24 || 0), value, logoUrl, pairAddr, supplyPct };
+      const change24h = Number(pair && pair.priceChange && pair.priceChange.h24 || 0);
+      return { ...t, price, change24h, value, logoUrl, pairAddr, supplyPct };
     }).sort((a, b) => b.value - a.value);
 
-    const wplsPair  = pairMap.get(WPLS_ADDR);
-    const plsPrice  = Number(wplsPair?.priceUsd || 0);
-    const plsLogo   = API.logoUrl(wplsPair, API.WPLS);
-    const plsPairAddr = wplsPair?.pairAddress || null;
+    const wplsPair    = pairMap.get(WPLS_ADDR);
+    const plsLogo     = API.logoUrl(wplsPair, API.WPLS);
+    const plsPairAddr = wplsPair && wplsPair.pairAddress || null;
 
     cachedTokens   = enriched;
     cachedPlsBal   = plsBal;
@@ -1731,9 +1732,12 @@ async function loadGroupPortfolio(group) {
   currentAddr = null;
 
   try {
-    const results = await Promise.all(
-      group.addresses.map(({ addr }) => Promise.all([API.getPlsBalance(addr), API.getTokenList(addr)]))
-    );
+    const [results, plsPrice] = await Promise.all([
+      Promise.all(
+        group.addresses.map(({ addr }) => Promise.all([API.getPlsBalance(addr), API.getTokenList(addr)]))
+      ),
+      API.getPlsPrice(),
+    ]);
 
     let totalPls = 0;
     const tokenMap = new Map();
@@ -1741,8 +1745,15 @@ async function loadGroupPortfolio(group) {
       totalPls += bal;
       tokens.filter(t => t.balance > 0).forEach(t => {
         const k = t.contractAddress.toLowerCase();
-        if (tokenMap.has(k)) tokenMap.get(k).balance += t.balance;
-        else tokenMap.set(k, { ...t });
+        if (tokenMap.has(k)) {
+          const existing = tokenMap.get(k);
+          existing.balance += t.balance;
+          // Merge price/logo from whichever entry has it
+          if (existing.priceUsd == null && t.priceUsd != null) existing.priceUsd = t.priceUsd;
+          if (!existing.logoUrl && t.logoUrl) existing.logoUrl = t.logoUrl;
+        } else {
+          tokenMap.set(k, { ...t });
+        }
       });
     });
 
@@ -1757,19 +1768,23 @@ async function loadGroupPortfolio(group) {
 
     const enriched = active.map((t, i) => {
       const pair  = pairMap.get(t.contractAddress.toLowerCase());
-      const price = Number(pair?.priceUsd || 0);
+      const price = (t.source === 'moralis' && t.priceUsd != null)
+        ? t.priceUsd
+        : Number(pair && pair.priceUsd || 0);
       const value = price * t.balance;
       const rawSup = supplies[i].status === 'fulfilled' ? supplies[i].value : null;
       const totalSup = rawSup ? Number(rawSup) / Math.pow(10, t.decimals) : null;
       const supplyPct = totalSup && totalSup > 0 ? (t.balance / totalSup) * 100 : null;
-      return { ...t, price, change24h: Number(pair?.priceChange?.h24 || 0), value, logoUrl: API.logoUrl(pair, t.contractAddress), pairAddr: pair?.pairAddress || null, supplyPct };
+      const change24h = Number(pair && pair.priceChange && pair.priceChange.h24 || 0);
+      const logoUrl = t.logoUrl || API.logoUrl(pair, t.contractAddress);
+      const pairAddr = pair && pair.pairAddress || null;
+      return { ...t, price, change24h, value, logoUrl, pairAddr, supplyPct };
     }).sort((a, b) => b.value - a.value);
 
     const wplsPair = pairMap.get(WPLS_ADDR);
-    const plsPrice = Number(wplsPair?.priceUsd || 0);
 
     cachedTokens = enriched; cachedPlsBal = totalPls; cachedPlsPrice = plsPrice;
-    cachedPlsLogo = API.logoUrl(wplsPair, API.WPLS); cachedPlsPair = wplsPair?.pairAddress || null;
+    cachedPlsLogo = API.logoUrl(wplsPair, API.WPLS); cachedPlsPair = wplsPair && wplsPair.pairAddress || null;
 
     sumUsd = enriched.reduce((s, t) => s + t.value, 0) + totalPls * plsPrice;
     sumPls = plsPrice > 0 ? sumUsd / plsPrice : 0;

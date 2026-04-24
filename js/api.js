@@ -415,6 +415,12 @@ const API = (() => {
             const decimals = Number(t.decimals || 18);
             const rawBal   = BigInt(t.balance || '0');
             const balance  = Number(rawBal) / Math.pow(10, decimals);
+            // Moralis returns usd_price as null for some tokens — keep null so
+            // the portfolio enrichment step can fill it in via DexScreener pairs.
+            const priceUsd = (t.usd_price != null) ? Number(t.usd_price) : null;
+            const valueUsd = (t.usd_value != null) ? Number(t.usd_value)
+                           : (priceUsd != null)     ? priceUsd * balance
+                           : null;
             return {
               symbol:          t.symbol,
               name:            t.name || t.symbol,
@@ -422,8 +428,8 @@ const API = (() => {
               decimals,
               contractAddress: t.token_address,
               logoUrl:         t.logo || t.thumbnail || null,
-              priceUsd:        t.usd_price ? Number(t.usd_price) : null,
-              valueUsd:        t.usd_value ? Number(t.usd_value) : null,
+              priceUsd,
+              valueUsd,
               source:          'moralis',
             };
           });
@@ -431,7 +437,7 @@ const API = (() => {
       }
     } catch (e) { console.warn('[getTokenList] Moralis failed:', e.message); }
 
-    // Fallback: BlockScout
+    // Fallback: BlockScout (no price data — portfolio will enrich via DexScreener)
     const data = await get(`${SCAN}?module=account&action=tokenlist&address=${addr}`);
     if (data.status !== '1') {
       if (data.message === 'No tokens found') return [];
@@ -448,6 +454,22 @@ const API = (() => {
       valueUsd:        null,
       source:          'blockscout',
     }));
+  }
+
+  // Fetch live PLS/USD price: Moralis first, DexScreener WPLS pair as fallback.
+  async function getPlsPrice() {
+    try {
+      const data = await get('/api/moralis/pls-price', 12000);
+      const p = data && (data.usdPrice != null ? data.usdPrice : data.usd_price);
+      if (p && Number(p) > 0) return Number(p);
+    } catch (e) { console.warn('[getPlsPrice] Moralis failed:', e.message); }
+    try {
+      const pairs = await getPairsByAddresses([WPLS]);
+      const pair  = pairs.get(WPLS.toLowerCase());
+      const p     = Number(pair && pair.priceUsd || 0);
+      if (p > 0) return p;
+    } catch (e) { console.warn('[getPlsPrice] DexScreener fallback failed:', e.message); }
+    return 0;
   }
 
   async function getTotalSupply(addr) {
@@ -604,6 +626,7 @@ const API = (() => {
     getTrendingPairs,
     getPlsBalance,
     getTokenList,
+    getPlsPrice,
     getTotalSupply,
     getTokenSecurity,
     getTokenMetadata,
