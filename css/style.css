@@ -1842,3 +1842,744 @@ a.commodity-card:hover {
 .pump-header {
   /* Same as .market-header but labeled for pump */
 }
+
+
+/* ═══════════════════════════════════════════════════════
+   AD BANNER STRIP
+   ═══════════════════════════════════════════════════════ */
+
+.ad-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .625rem;
+  margin-bottom: 1.5rem;
+  padding: .5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ad-slot {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-height: 80px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+}
+
+.ad-slot--empty {
+  border: 2px dashed var(--border-light);
+  background: var(--bg-2);
+}
+
+.ad-banner-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ad-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  min-height: 80px;
+  max-height: 120px;
+}
+
+.ad-banner-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 80px;
+}
+
+.ad-slot-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 1rem .75rem;
+  min-height: 80px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.ad-slot--empty:hover .ad-slot-placeholder,
+.ad-banner-cta:hover .ad-slot-placeholder {
+  background: var(--primary-dim);
+}
+
+.ad-slot-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.ad-slot-text {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.ad-slot-text strong {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ad-slot-text span {
+  font-size: .72rem;
+  color: var(--primary);
+}
+
+.ad-banner-label {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: .55rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--text-3);
+  background: rgba(0,0,0,.5);
+  padding: 1px 4px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Mobile: stack to single column */
+@media (max-width: 680px) {
+  .ad-strip {
+    grid-template-columns: 1fr;
+  }
+  .ad-slot:not(:first-child) {
+    display: none; /* show only first ad on mobile */
+  }
+}
+
+/* Advertise tab button highlight */
+.tab-btn-advertise {
+  margin-left: auto;
+  background: linear-gradient(135deg, var(--primary-dim), transparent);
+  border: 1px solid var(--primary) !important;
+  color: var(--primary) !important;
+  border-radius: var(--radius-sm) !important;
+}
+.tab-btn-advertise:hover {
+  background: var(--primary-dim) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ADVERTISE PAGE — HERO
+   ═══════════════════════════════════════════════════════ */
+
+.adpage-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.adpage-hero-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.adpage-hero-stats {
+  display: flex;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
+.adpage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1.25rem;
+  min-width: 80px;
+  text-align: center;
+}
+
+.adpage-stat-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+
+.adpage-stat-lbl {
+  font-size: .68rem;
+  color: var(--text-2);
+  margin-top: .2rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ADVERTISE PAGE — PLANS
+   ═══════════════════════════════════════════════════════ */
+
+.adplan-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: .35rem;
+  color: var(--text);
+}
+
+.adplan-subtitle {
+  font-size: .85rem;
+  color: var(--text-2);
+  margin-bottom: 1.5rem;
+}
+
+.adplan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  max-width: 720px;
+}
+
+.adplan-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.adplan-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.adplan-card--featured {
+  border-color: var(--primary);
+  background: linear-gradient(145deg, var(--bg-1), var(--primary-dim));
+  box-shadow: 0 0 24px var(--primary-glow);
+}
+
+.adplan-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.adplan-duration {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.adplan-badge {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.adplan-badge--gold {
+  background: linear-gradient(135deg, #f59e0b33, #f59e0b11);
+  color: #f59e0b;
+  border-color: #f59e0b66;
+}
+
+.adplan-price {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+}
+
+.adplan-price-val {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+
+.adplan-price-cur {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.adplan-usd-est {
+  font-size: .75rem;
+  color: var(--text-3);
+  margin-top: -.4rem;
+}
+
+.adplan-features {
+  list-style: none;
+  padding: 0;
+  margin: .25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.adplan-features li {
+  font-size: .82rem;
+  color: var(--text-2);
+}
+
+.adplan-features li:first-child {
+  color: var(--text);
+}
+
+.adplan-select-btn {
+  margin-top: auto;
+  width: 100%;
+  justify-content: center;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ADVERTISE PAGE — HOW IT WORKS
+   ═══════════════════════════════════════════════════════ */
+
+.adpage-steps {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.adpage-step {
+  display: flex;
+  align-items: flex-start;
+  gap: .625rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem 1rem;
+  flex: 1;
+  min-width: 140px;
+}
+
+.adpage-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.adpage-step-text {
+  font-size: .8rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+.adpage-step-text strong {
+  color: var(--text);
+}
+
+.adpage-step-arrow {
+  font-size: 1.25rem;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .adpage-step-arrow { display: none; }
+}
+
+.adpage-specs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: .5rem;
+  margin: .75rem 0;
+}
+
+.adpage-spec-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .5rem .75rem;
+  font-size: .8rem;
+}
+
+.adpage-spec-key {
+  color: var(--text-2);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.adpage-spec-val {
+  color: var(--text);
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ADVERTISE PAGE — FORM
+   ═══════════════════════════════════════════════════════ */
+
+.adform-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.adform-back-btn {
+  margin-top: .3rem;
+  flex-shrink: 0;
+}
+
+.adform-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .adform-layout { grid-template-columns: 1fr; }
+}
+
+.adform-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.adform-plan-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--primary-dim);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: .6rem 1rem;
+  font-size: .88rem;
+}
+
+.adform-group {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.adform-label {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.adform-required {
+  color: var(--accent);
+}
+
+.adform-input {
+  width: 100%;
+  max-width: 520px;
+}
+
+.adform-textarea {
+  width: 100%;
+  max-width: 520px;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.adform-hint {
+  font-size: .73rem;
+  color: var(--text-3);
+}
+
+.adform-char-count {
+  font-size: .73rem;
+  color: var(--text-3);
+  text-align: right;
+  max-width: 520px;
+}
+
+.adform-radio-group {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.adform-radio-label {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+  font-size: .85rem;
+  color: var(--text);
+}
+
+.adform-radio-label input[type="radio"] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+}
+
+/* Image upload */
+.adform-img-requirements {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .625rem .875rem;
+  font-size: .75rem;
+  color: var(--text-2);
+  max-width: 520px;
+}
+
+.adform-img-requirements ul {
+  margin: .3rem 0 0 1rem;
+  padding: 0;
+}
+
+.adform-img-requirements li {
+  margin-bottom: .2rem;
+}
+
+.adform-upload-area {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  max-width: 520px;
+  transition: border-color .15s, background .15s;
+  font-size: .82rem;
+  color: var(--text-2);
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.adform-upload-area:hover {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
+
+/* Payment section */
+.adform-payment-section {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .875rem;
+}
+
+.adform-section-title {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: .25rem;
+}
+
+.adform-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .88rem;
+  padding: .5rem .75rem;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+}
+
+.adform-payment-row strong {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: .95rem;
+}
+
+.adform-wallet-display {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem;
+}
+
+.adform-wallet-box {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .5rem .75rem;
+  margin-top: .35rem;
+}
+
+.adform-wallet-addr {
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  color: var(--text);
+  word-break: break-all;
+  flex: 1;
+}
+
+/* Terms */
+.adform-terms {
+  display: flex;
+  flex-direction: column;
+  gap: .625rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+}
+
+.adform-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.adform-check-label input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: .1rem;
+}
+
+/* Actions row */
+.adform-actions {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.adform-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+/* Success */
+.adform-success {
+  background: linear-gradient(135deg, #22c55e22, #22c55e08);
+  border: 1px solid #22c55e66;
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text);
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ADVERTISE PAGE — PREVIEW PANEL
+   ═══════════════════════════════════════════════════════ */
+
+.adform-preview-panel {
+  position: sticky;
+  top: 1rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.adform-preview-title {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.adform-preview-plan-label {
+  font-size: .72rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.adform-preview-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.adform-preview-banner-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.adform-preview-banner {
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.adform-preview-meta {
+  padding: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.adform-preview-name {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.adform-preview-desc {
+  font-size: .75rem;
+  color: var(--text-2);
+}
+
+.adform-preview-cta {
+  align-self: flex-start;
+  font-size: .72rem;
+  padding: .25rem .625rem;
+}
+
+.adform-preview-note {
+  font-size: .7rem;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+

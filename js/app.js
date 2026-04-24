@@ -358,6 +358,7 @@ function switchTab(name) {
   if (name === 'watchlist') loadWatchlistTab();
   if (name === 'swap')      initSwap();
   if (name === 'links')     {}
+  if (name === 'advertise') adUpdatePlanPriceEstimates();
 }
 
 tabs.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
@@ -2895,3 +2896,263 @@ async function loadModalWhales() {
     switchTab(lastTab);
   }
 })();
+
+
+/* ══════════════════════════════════════════════════════
+   ADVERTISE TAB
+   ══════════════════════════════════════════════════════ */
+
+let adCurrentPlan = null; // '3day' | '1week'
+
+// Called when user clicks a plan card
+function adSelectPlan(plan) {
+  adCurrentPlan = plan;
+
+  const is3day = plan === '3day';
+  const plsAmount = is3day ? '1,000,000' : '2,000,000';
+  const planLabel = is3day ? '3-Day Banner' : '1-Week Banner';
+
+  // Update form fields
+  const pillLabel  = document.getElementById('adform-plan-label');
+  const pillPrice  = document.getElementById('adform-plan-pill') && document.getElementById('adform-plan-price');
+  const formTitle  = document.getElementById('adform-title');
+  const formSub    = document.getElementById('adform-subtitle');
+  const payTotal   = document.getElementById('adform-payment-total');
+  const previewLbl = document.getElementById('adform-preview-plan-label');
+
+  if (pillLabel)  pillLabel.textContent  = planLabel;
+  if (pillPrice)  pillPrice.textContent  = plsAmount + ' PLS';
+  if (formTitle)  formTitle.textContent  = 'Create Your PulseCentral Campaign';
+  if (formSub)    formSub.textContent    = `You've selected the ${planLabel} (${plsAmount} PLS). Fill in your ad details and payment info below.`;
+  if (payTotal)   payTotal.textContent   = plsAmount + ' PLS';
+  if (previewLbl) previewLbl.textContent = planLabel;
+
+  // Also set the price in the pill
+  const priceEl = document.getElementById('adform-plan-price');
+  if (priceEl) priceEl.textContent = plsAmount + ' PLS';
+
+  adShowForm();
+}
+
+function adShowForm() {
+  const plans = document.getElementById('adpage-plans');
+  const form  = document.getElementById('adpage-form');
+  if (plans) plans.classList.add('hidden');
+  if (form)  form.classList.remove('hidden');
+  // Reset error/success
+  const err = document.getElementById('adform-error');
+  const suc = document.getElementById('adform-success');
+  const act = document.getElementById('adform-actions');
+  if (err) { err.textContent = ''; err.classList.add('hidden'); }
+  if (suc) suc.classList.add('hidden');
+  if (act) act.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function adShowPlans() {
+  const plans = document.getElementById('adpage-plans');
+  const form  = document.getElementById('adpage-form');
+  if (plans) plans.classList.remove('hidden');
+  if (form)  form.classList.add('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Toggle token address vs project name field
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[name="adform-type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isToken = document.querySelector('input[name="adform-type"]:checked')?.value === 'token';
+      const tokenWrap   = document.getElementById('adform-token-addr-wrap');
+      const projectWrap = document.getElementById('adform-project-name-wrap');
+      if (tokenWrap)   tokenWrap.classList.toggle('hidden', !isToken);
+      if (projectWrap) projectWrap.classList.toggle('hidden', isToken);
+      adUpdatePreview();
+    });
+  });
+
+  // Drag-and-drop on upload area
+  const uploadArea = document.getElementById('adform-upload-area');
+  if (uploadArea) {
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--primary)'; });
+    uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '';
+      const file = e.dataTransfer?.files?.[0];
+      if (file) adProcessImageFile(file);
+    });
+  }
+
+  // Populate USD estimates for plan cards
+  adUpdatePlanPriceEstimates();
+});
+
+async function adUpdatePlanPriceEstimates() {
+  try {
+    const plsPrice = await API.getPlsPrice();
+    if (!plsPrice || plsPrice <= 0) return;
+    const est3day  = document.getElementById('adplan-3day-usd');
+    const est1week = document.getElementById('adplan-1week-usd');
+    const fmt      = v => '$' + (v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (est3day)  est3day.textContent  = '≈ ' + fmt(1_000_000 * plsPrice) + ' USD';
+    if (est1week) est1week.textContent = '≈ ' + fmt(2_000_000 * plsPrice) + ' USD';
+  } catch (e) {
+    // silently fail — estimates are non-critical
+  }
+}
+
+function adUpdateCharCount() {
+  const ta  = document.getElementById('adform-desc');
+  const cnt = document.getElementById('adform-desc-count');
+  if (ta && cnt) cnt.textContent = ta.value.length;
+}
+
+function adHandleImageUpload(input) {
+  const file = input.files?.[0];
+  if (file) adProcessImageFile(file);
+}
+
+function adProcessImageFile(file) {
+  if (!file.type.match(/image\/(png|jpeg|webp)/)) {
+    alert('Please upload a PNG, JPG, or WEBP image.');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image must be under 5 MB.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const src = e.target.result;
+    const placeholder = document.getElementById('adform-upload-placeholder');
+    const preview     = document.getElementById('adform-upload-preview');
+    const thumb       = document.getElementById('adform-img-preview-thumb');
+    const name        = document.getElementById('adform-img-name');
+    if (placeholder) placeholder.classList.add('hidden');
+    if (preview)     preview.classList.remove('hidden');
+    if (thumb)       thumb.src = src;
+    if (name)        name.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+    // Update preview panel banner
+    const prevBanner = document.getElementById('adform-preview-banner');
+    if (prevBanner) prevBanner.src = src;
+    // Store for submission
+    window._adImageData = src;
+    window._adImageFile = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function adClearImage(e) {
+  e.stopPropagation();
+  const placeholder = document.getElementById('adform-upload-placeholder');
+  const preview     = document.getElementById('adform-upload-preview');
+  const fileInput   = document.getElementById('adform-img-input');
+  if (placeholder) placeholder.classList.remove('hidden');
+  if (preview)     preview.classList.add('hidden');
+  if (fileInput)   fileInput.value = '';
+  window._adImageData = null;
+  window._adImageFile = null;
+  const prevBanner = document.getElementById('adform-preview-banner');
+  if (prevBanner) prevBanner.src = '/assets/peacock_banner.png';
+}
+
+function adUpdatePreview() {
+  const isToken   = document.querySelector('input[name="adform-type"]:checked')?.value === 'token';
+  const nameInput = isToken
+    ? document.getElementById('adform-token-addr')?.value
+    : document.getElementById('adform-project-name')?.value;
+  const desc      = document.getElementById('adform-desc')?.value || '';
+  const url       = document.getElementById('adform-url')?.value || '#';
+
+  const prevName = document.getElementById('adform-preview-name');
+  const prevDesc = document.getElementById('adform-preview-desc');
+  const prevCta  = document.getElementById('adform-preview-cta');
+
+  if (prevName) prevName.textContent = nameInput || (isToken ? 'Your Token Address' : 'Your Project Name');
+  if (prevDesc) prevDesc.textContent = desc || 'Your ad description will appear here…';
+  if (prevCta)  prevCta.href = url || '#';
+}
+
+function adCopyWallet() {
+  const addrEl = document.getElementById('adform-wallet-addr');
+  const btnEl  = document.getElementById('adform-copy-wallet-btn');
+  if (!addrEl) return;
+  const addr = addrEl.textContent.trim();
+  if (addr.startsWith('Payment wallet') || !addr.startsWith('0x')) {
+    alert('Wallet address not yet configured. Check back soon!');
+    return;
+  }
+  navigator.clipboard.writeText(addr).then(() => {
+    if (btnEl) { const orig = btnEl.textContent; btnEl.textContent = '✓ Copied!'; setTimeout(() => { btnEl.textContent = orig; }, 1500); }
+  }).catch(() => {
+    prompt('Copy this address:', addr);
+  });
+}
+
+async function adSubmit() {
+  // Validate
+  const isToken    = document.querySelector('input[name="adform-type"]:checked')?.value === 'token';
+  const tokenAddr  = document.getElementById('adform-token-addr')?.value.trim();
+  const projName   = document.getElementById('adform-project-name')?.value.trim();
+  const imgData    = window._adImageData;
+  const desc       = document.getElementById('adform-desc')?.value.trim();
+  const url        = document.getElementById('adform-url')?.value.trim();
+  const email      = document.getElementById('adform-email')?.value.trim();
+  const txHash     = document.getElementById('adform-txhash')?.value.trim();
+  const terms1     = document.getElementById('adform-terms1')?.checked;
+  const terms2     = document.getElementById('adform-terms2')?.checked;
+
+  const errEl = document.getElementById('adform-error');
+  function showErr(msg) {
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    errEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  if (isToken && !tokenAddr) return showErr('Please enter a PulseChain token contract address.');
+  if (!isToken && !projName) return showErr('Please enter your project or campaign name.');
+  if (!imgData)              return showErr('Please upload a banner image.');
+  if (!desc)                 return showErr('Please write a short ad description.');
+  if (!url || !url.startsWith('http')) return showErr('Please enter a valid destination URL (must start with https://).');
+  if (!email || !email.includes('@'))  return showErr('Please enter a valid contact email address.');
+  if (!txHash)               return showErr('Please paste your transaction hash after sending payment.');
+  if (!terms1 || !terms2)    return showErr('You must accept both Terms & Conditions to submit.');
+
+  // Hide error, show spinner
+  if (errEl) errEl.classList.add('hidden');
+  const btn     = document.getElementById('adform-submit-btn');
+  const btnText = document.getElementById('adform-submit-text');
+  const spinner = document.getElementById('adform-submit-spinner');
+  if (btn)     btn.disabled    = true;
+  if (btnText) btnText.classList.add('hidden');
+  if (spinner) spinner.classList.remove('hidden');
+
+  // Simulate async submission (replace with real API call when ready)
+  await new Promise(r => setTimeout(r, 1200));
+
+  if (btn)     btn.disabled    = false;
+  if (btnText) btnText.classList.remove('hidden');
+  if (spinner) spinner.classList.add('hidden');
+
+  // Show success
+  const sucEl    = document.getElementById('adform-success');
+  const actEl    = document.getElementById('adform-actions');
+  const sucEmail = document.getElementById('adform-success-email');
+  if (sucEmail) sucEmail.textContent = email;
+  if (sucEl)  sucEl.classList.remove('hidden');
+  if (actEl)  actEl.classList.add('hidden');
+  sucEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Console log submission data for backend integration
+  console.log('[Ad Submission]', {
+    plan: adCurrentPlan,
+    type: isToken ? 'token' : 'other',
+    tokenAddr: isToken ? tokenAddr : null,
+    projectName: !isToken ? projName : null,
+    desc,
+    url,
+    email,
+    txHash,
+    imageFile: window._adImageFile,
+    submittedAt: new Date().toISOString(),
+  });
+}
