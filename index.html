@@ -66,7 +66,10 @@
         </a>
       </div>
     </div>
-<button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
+<button class="tab-btn" data-tab="memegen" role="tab" aria-selected="false" aria-controls="tab-memegen">
+      <span aria-hidden="true">🎨</span><span class="tab-label">Meme Generator</span>
+    </button>
+    <button class="tab-btn" data-tab="links"     role="tab" aria-selected="false" aria-controls="tab-links">
       <span aria-hidden="true">🔗</span><span class="tab-label">Links</span>
     </button>
     <button class="tab-btn" data-tab="markets-stats" role="tab" aria-selected="false" aria-controls="tab-markets-stats">
@@ -801,6 +804,189 @@
      PUMP.TIRES TAB
      ═══════════════════════════════════════════════════ -->
 <!-- ═══════════════════════════════════════════════════
+     MEME GENERATOR TAB
+     ═══════════════════════════════════════════════════ -->
+<div id="tab-memegen" class="tab-panel" role="tabpanel">
+  <div class="page">
+
+    <!-- AD STRIP -->
+    <div class="ad-strip" id="ad-strip-memegen">
+      <div class="ad-slot" data-slot="0">
+        <a href="#" class="ad-banner-link" target="_blank" rel="noopener sponsored">
+          <img class="ad-banner-img" src="/assets/peacock_banner.png" alt="PCOCK" loading="lazy">
+          <div class="ad-banner-label">AD</div>
+        </a>
+      </div>
+      <div class="ad-slot ad-slot--empty" data-slot="1">
+        <a href="#tab-advertise" class="ad-banner-link ad-banner-cta" onclick="switchTab('advertise');return false;">
+          <div class="ad-slot-placeholder"><span class="ad-slot-icon">📢</span><div class="ad-slot-text"><strong>Your Ad Here</strong><span>Advertise on PulseCentral</span></div></div>
+          <div class="ad-banner-label">AD</div>
+        </a>
+      </div>
+      <div class="ad-slot ad-slot--empty" data-slot="2">
+        <a href="#tab-advertise" class="ad-banner-link ad-banner-cta" onclick="switchTab('advertise');return false;">
+          <div class="ad-slot-placeholder"><span class="ad-slot-icon">📢</span><div class="ad-slot-text"><strong>Your Ad Here</strong><span>Advertise on PulseCentral</span></div></div>
+          <div class="ad-banner-label">AD</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="page-title">🎨 Meme Generator</div>
+    <div class="page-subtitle">Describe your meme or image idea and let AI generate it instantly. Powered by Puter.js — free, no API key needed.</div>
+
+    <div class="memegen-layout">
+
+      <!-- LEFT: Controls -->
+      <div class="memegen-controls">
+
+        <!-- Model selector -->
+        <div class="memegen-group">
+          <label class="memegen-label">AI Model</label>
+          <div class="memegen-model-grid" id="memegen-model-grid">
+            <button class="memegen-model-btn active" data-model="flux.1-schnell" title="Fastest — great for memes">
+              <span class="memegen-model-icon">⚡</span>
+              <div>
+                <div class="memegen-model-name">FLUX Schnell</div>
+                <div class="memegen-model-desc">Fastest · Great quality</div>
+              </div>
+            </button>
+            <button class="memegen-model-btn" data-model="dall-e-3" title="OpenAI DALL-E 3">
+              <span class="memegen-model-icon">🎨</span>
+              <div>
+                <div class="memegen-model-name">DALL-E 3</div>
+                <div class="memegen-model-desc">OpenAI · HD quality</div>
+              </div>
+            </button>
+            <button class="memegen-model-btn" data-model="stable-diffusion-xl-base-1.0" title="Classic Stable Diffusion XL">
+              <span class="memegen-model-icon">🖌️</span>
+              <div>
+                <div class="memegen-model-name">Stable Diffusion XL</div>
+                <div class="memegen-model-desc">Classic · Artistic</div>
+              </div>
+            </button>
+            <button class="memegen-model-btn" data-model="black-forest-labs/FLUX.1-dev" title="FLUX Dev — high quality">
+              <span class="memegen-model-icon">🌊</span>
+              <div>
+                <div class="memegen-model-name">FLUX Dev</div>
+                <div class="memegen-model-desc">High quality · Detailed</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Prompt input -->
+        <div class="memegen-group">
+          <label class="memegen-label" for="memegen-prompt">
+            Your Prompt
+            <span class="memegen-label-hint">Be descriptive — include style, mood, characters, setting</span>
+          </label>
+          <textarea
+            id="memegen-prompt"
+            class="input memegen-textarea"
+            placeholder="e.g. A PulseChain rocket launching to the moon with HEX tokens raining down, cartoon style, vibrant colors, meme format..."
+            maxlength="1000"
+            rows="5"
+          ></textarea>
+          <div class="memegen-char-row">
+            <span class="memegen-char-count"><span id="memegen-char">0</span>/1000</span>
+            <button class="btn btn-ghost btn-sm" id="memegen-roll-btn" onclick="memegenRoll()" title="Random PulseChain meme prompt">
+              🎲 Random
+            </button>
+          </div>
+        </div>
+
+        <!-- Style presets -->
+        <div class="memegen-group">
+          <label class="memegen-label">Style Presets <span class="memegen-label-hint">Click to append</span></label>
+          <div class="memegen-presets" id="memegen-presets">
+            <button class="memegen-preset-chip" data-style="meme format, bold impact font, funny">😂 Meme</button>
+            <button class="memegen-preset-chip" data-style="pixel art, 8-bit, retro game style">👾 Pixel Art</button>
+            <button class="memegen-preset-chip" data-style="cartoon style, vibrant colors, smooth lines">🎠 Cartoon</button>
+            <button class="memegen-preset-chip" data-style="photorealistic, ultra detailed, 4K">📸 Realistic</button>
+            <button class="memegen-preset-chip" data-style="cyberpunk, neon lights, futuristic city">🌆 Cyberpunk</button>
+            <button class="memegen-preset-chip" data-style="anime style, manga, Japanese art">⛩️ Anime</button>
+            <button class="memegen-preset-chip" data-style="oil painting, impressionist, renaissance">🖼️ Painting</button>
+            <button class="memegen-preset-chip" data-style="low poly, geometric shapes, minimalist">🔺 Low Poly</button>
+            <button class="memegen-preset-chip" data-style="crypto themed, blockchain, bull market vibes">💎 Crypto</button>
+            <button class="memegen-preset-chip" data-style="grumpy cat style, sarcastic, internet meme">🐱 Cat Meme</button>
+          </div>
+        </div>
+
+        <!-- Generate button -->
+        <button class="btn btn-primary memegen-generate-btn" id="memegen-generate-btn" onclick="memegenGenerate()">
+          <span id="memegen-btn-text">✨ Generate Image</span>
+          <span class="spinner hidden" id="memegen-btn-spinner" style="width:14px;height:14px;border-width:2px;margin-left:.4rem;"></span>
+        </button>
+
+        <!-- Error message -->
+        <div class="error-banner hidden" id="memegen-error" role="alert"></div>
+
+        <!-- Puter.js info -->
+        <div class="memegen-powered-by">
+          Powered by <a href="https://puter.com" target="_blank" rel="noopener">Puter.js</a> · Free AI generation · No API key required
+          <br><span style="opacity:.7;">First generation may ask you to sign in with a free Puter account.</span>
+        </div>
+
+      </div><!-- /memegen-controls -->
+
+      <!-- RIGHT: Output -->
+      <div class="memegen-output-panel">
+        <!-- Placeholder state -->
+        <div class="memegen-placeholder" id="memegen-placeholder">
+          <div class="memegen-placeholder-icon">🎨</div>
+          <div class="memegen-placeholder-title">Your image will appear here</div>
+          <div class="memegen-placeholder-sub">Describe your vision and click Generate</div>
+          <div class="memegen-example-prompts">
+            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.06em;">Try these PulseChain meme ideas</div>
+            <button class="memegen-example" onclick="memegenUseExample(this)">Richard Heart riding a dragon made of PLS tokens</button>
+            <button class="memegen-example" onclick="memegenUseExample(this)">A HEX crystal glowing in space, maximalist, neon</button>
+            <button class="memegen-example" onclick="memegenUseExample(this)">Pepe the frog holding a PulseChain flag at the moon</button>
+            <button class="memegen-example" onclick="memegenUseExample(this)">PulseX DEX as a futuristic space station, cyberpunk</button>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div class="memegen-generating hidden" id="memegen-generating">
+          <div class="memegen-gen-animation">
+            <div class="memegen-gen-orb"></div>
+          </div>
+          <div class="memegen-gen-text">Generating your image…</div>
+          <div class="memegen-gen-sub" id="memegen-gen-model-label">This usually takes 5–20 seconds</div>
+        </div>
+
+        <!-- Result state -->
+        <div class="memegen-result hidden" id="memegen-result">
+          <div class="memegen-img-wrap" id="memegen-img-wrap">
+            <!-- Image injected here by JS -->
+          </div>
+          <div class="memegen-result-actions">
+            <button class="btn btn-primary" id="memegen-save-btn" onclick="memegenSave()">
+              💾 Save Image
+            </button>
+            <button class="btn btn-ghost" onclick="memegenGenerate()">
+              🔄 Regenerate
+            </button>
+            <button class="btn btn-ghost" onclick="memegenReset()">
+              ✏️ New Prompt
+            </button>
+          </div>
+          <div class="memegen-result-prompt" id="memegen-result-prompt"></div>
+        </div>
+
+      </div><!-- /memegen-output-panel -->
+
+    </div><!-- /memegen-layout -->
+
+    <!-- History strip -->
+    <div class="memegen-history-section" id="memegen-history-section" style="display:none;">
+      <div class="memegen-history-title">📚 Recent Generations <button class="btn btn-ghost btn-sm" onclick="memegenClearHistory()" style="float:right;margin-top:-.1rem;">Clear</button></div>
+      <div class="memegen-history-grid" id="memegen-history-grid"></div>
+    </div>
+
+  </div><!-- /page -->
+</div><!-- /tab-memegen -->
+
+<!-- ═══════════════════════════════════════════════════
      LINKS TAB
      ═══════════════════════════════════════════════════ -->
 <div id="tab-links" class="tab-panel" role="tabpanel">
@@ -1330,6 +1516,7 @@
 <!-- ═══════════════════════════════════════════════════
      SCRIPTS
      ═══════════════════════════════════════════════════ -->
+<script src="https://js.puter.com/v2/"></script>
 <script src="/js/trades.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/app.js"></script>

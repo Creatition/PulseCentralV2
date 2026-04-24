@@ -358,6 +358,7 @@ function switchTab(name) {
   if (name === 'watchlist') loadWatchlistTab();
   if (name === 'swap')      initSwap();
   if (name === 'links')     {}
+  if (name === 'memegen')   {} // Puter.js handles generation on demand
   if (name === 'advertise') adUpdatePlanPriceEstimates();
 }
 
@@ -3500,3 +3501,283 @@ async function adSubmit() {
 
   draw();
 })();
+
+
+/* ══════════════════════════════════════════════════════
+   MEME GENERATOR
+   Uses Puter.js — free, no API key, user-pays model
+   Docs: https://developer.puter.com/tutorials/free-unlimited-image-generation-api/
+   ══════════════════════════════════════════════════════ */
+
+let memegenCurrentModel    = 'flux.1-schnell';
+let memegenCurrentImage    = null; // latest generated image element
+let memegenCurrentPrompt   = '';
+let memegenHistory         = [];   // {src, prompt, ts}
+const MEMEGEN_MAX_HISTORY  = 12;
+
+// Random meme prompt seeds
+const MEMEGEN_RANDOM_PROMPTS = [
+  'Richard Heart surfing a giant wave of PLS tokens, cartoon meme style, bold colors',
+  'HEX crystal flying through space with a rocket, neon colors, crypto meme',
+  'Pepe the frog wearing a crown, holding a PulseChain flag on the moon',
+  'A diamond-hand wojak laughing at bears, bold meme format, crypto culture',
+  'PulseChain bull stomping bears into the ground, epic fantasy art style',
+  'A neon-lit futuristic city with PLS logo in the sky, cyberpunk aesthetic',
+  'Happy merchant pepe accepting PLS tokens, cartoon meme, vibrant',
+  'INC logo emerging from black hole in space, galaxy background, sci-fi',
+  'Gigachad holding HEX tokens, epic lighting, ultra-detailed meme style',
+  'PulseX spaceship launching to the moon with HEX passengers, cartoon style',
+  'Bitcoin crying while PulseChain rockets up, stock market chart meme',
+  'A wizard with a PulseChain staff casting crypto spells, fantasy art',
+  'Richard Heart as a Roman emperor with crypto senators, historical meme',
+  'PulseChain dragon breathing fire on ETH gas fees, epic fantasy',
+  'wojak couple, boyfriend staring at PLS chart, girlfriend is HEX, meme format',
+];
+
+// ── Init: wire up controls ──────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Model selector
+  document.querySelectorAll('.memegen-model-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.memegen-model-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      memegenCurrentModel = btn.dataset.model;
+    });
+  });
+
+  // Prompt char counter
+  const promptEl = document.getElementById('memegen-prompt');
+  if (promptEl) {
+    promptEl.addEventListener('input', () => {
+      const cnt = document.getElementById('memegen-char');
+      if (cnt) cnt.textContent = promptEl.value.length;
+    });
+    // Allow Ctrl+Enter to generate
+    promptEl.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') memegenGenerate();
+    });
+  }
+
+  // Style preset chips
+  document.querySelectorAll('.memegen-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const style = chip.dataset.style;
+      const ta    = document.getElementById('memegen-prompt');
+      if (!ta || !style) return;
+      const current = ta.value.trim();
+      // Append style if not already in prompt
+      if (!current.toLowerCase().includes(style.toLowerCase().slice(0, 10))) {
+        ta.value = current ? `${current}, ${style}` : style;
+        const cnt = document.getElementById('memegen-char');
+        if (cnt) cnt.textContent = ta.value.length;
+      }
+      chip.classList.add('applied');
+      setTimeout(() => chip.classList.remove('applied'), 1500);
+    });
+  });
+});
+
+// ── Use example prompt ──────────────────────────────────
+function memegenUseExample(btn) {
+  const ta = document.getElementById('memegen-prompt');
+  if (!ta || !btn) return;
+  ta.value = btn.textContent.trim();
+  const cnt = document.getElementById('memegen-char');
+  if (cnt) cnt.textContent = ta.value.length;
+  ta.focus();
+  // Scroll to generate button
+  document.getElementById('memegen-generate-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── Random prompt ───────────────────────────────────────
+function memegenRoll() {
+  const ta = document.getElementById('memegen-prompt');
+  if (!ta) return;
+  const idx = Math.floor(Math.random() * MEMEGEN_RANDOM_PROMPTS.length);
+  ta.value = MEMEGEN_RANDOM_PROMPTS[idx];
+  const cnt = document.getElementById('memegen-char');
+  if (cnt) cnt.textContent = ta.value.length;
+}
+
+// ── Set UI state ────────────────────────────────────────
+function memegenSetState(state) {
+  // states: 'idle' | 'generating' | 'result'
+  const placeholder  = document.getElementById('memegen-placeholder');
+  const generating   = document.getElementById('memegen-generating');
+  const result       = document.getElementById('memegen-result');
+  const btnText      = document.getElementById('memegen-btn-text');
+  const btnSpinner   = document.getElementById('memegen-btn-spinner');
+  const btn          = document.getElementById('memegen-generate-btn');
+
+  if (placeholder) placeholder.classList.toggle('hidden', state !== 'idle');
+  if (generating)  generating.classList.toggle('hidden',  state !== 'generating');
+  if (result)      result.classList.toggle('hidden',      state !== 'result');
+
+  if (btnText)    btnText.classList.toggle('hidden',   state === 'generating');
+  if (btnSpinner) btnSpinner.classList.remove('hidden');
+  if (btnSpinner) btnSpinner.classList.toggle('hidden', state !== 'generating');
+  if (btn)        btn.disabled = (state === 'generating');
+}
+
+// ── Main generate function ──────────────────────────────
+async function memegenGenerate() {
+  const ta = document.getElementById('memegen-prompt');
+  const errEl = document.getElementById('memegen-error');
+
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+
+  const prompt = ta?.value?.trim();
+  if (!prompt) {
+    if (errEl) { errEl.textContent = 'Please enter a prompt first.'; errEl.classList.remove('hidden'); }
+    ta?.focus();
+    return;
+  }
+
+  if (typeof puter === 'undefined') {
+    if (errEl) {
+      errEl.textContent = 'Puter.js is still loading — please wait a moment and try again.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  memegenCurrentPrompt = prompt;
+  memegenSetState('generating');
+
+  // Update "generating" label with chosen model name
+  const modelLabel = document.getElementById('memegen-gen-model-label');
+  const activeModelBtn = document.querySelector('.memegen-model-btn.active');
+  const modelName = activeModelBtn?.querySelector('.memegen-model-name')?.textContent || memegenCurrentModel;
+  if (modelLabel) modelLabel.textContent = `Model: ${modelName} · Usually takes 5–20 seconds`;
+
+  try {
+    // puter.ai.txt2img returns an <img> element directly
+    const imgEl = await puter.ai.txt2img(prompt, {
+      model:   memegenCurrentModel,
+      // quality applies to DALL-E/GPT Image models
+      quality: memegenCurrentModel.startsWith('dall-e') || memegenCurrentModel.startsWith('gpt-image') ? 'hd' : undefined,
+    });
+
+    memegenCurrentImage = imgEl;
+
+    // Inject image into result panel
+    const wrap = document.getElementById('memegen-img-wrap');
+    if (wrap) {
+      wrap.innerHTML = '';
+      imgEl.style.cssText = 'max-width:100%;max-height:520px;width:100%;height:auto;object-fit:contain;display:block;';
+      wrap.appendChild(imgEl);
+    }
+
+    // Show prompt caption
+    const caption = document.getElementById('memegen-result-prompt');
+    if (caption) caption.textContent = `"${prompt}"`;
+
+    // Add to history
+    memegenAddToHistory(imgEl.src, prompt);
+
+    memegenSetState('result');
+  } catch (e) {
+    console.error('[memegenGenerate]', e);
+    memegenSetState('idle');
+    if (errEl) {
+      const msg = e?.message || String(e);
+      // Friendly error messages
+      const friendly = msg.includes('permission') || msg.includes('auth') || msg.includes('sign')
+        ? 'Please sign in with your free Puter account to generate images. A sign-in popup will appear.'
+        : msg.includes('rate') || msg.includes('quota') || msg.includes('limit')
+        ? 'Rate limit reached. Please wait a minute and try again.'
+        : msg.includes('content') || msg.includes('policy') || msg.includes('safety')
+        ? 'Your prompt was blocked by content policy. Try rephrasing it.'
+        : `Generation failed: ${msg}. Please try again or switch models.`;
+      errEl.textContent = friendly;
+      errEl.classList.remove('hidden');
+    }
+  }
+}
+
+// ── Save / download image ───────────────────────────────
+function memegenSave(src, filename) {
+  const imgSrc = src || memegenCurrentImage?.src;
+  if (!imgSrc) return;
+  const safeName = (filename || memegenCurrentPrompt || 'pulsecental-meme')
+    .slice(0, 40)
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+  const a = document.createElement('a');
+  a.href = imgSrc;
+  a.download = `${safeName}-${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── Reset to prompt input ───────────────────────────────
+function memegenReset() {
+  memegenSetState('idle');
+  const errEl = document.getElementById('memegen-error');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+}
+
+// ── History management ──────────────────────────────────
+function memegenAddToHistory(src, prompt) {
+  if (!src) return;
+  memegenHistory.unshift({ src, prompt, ts: Date.now() });
+  if (memegenHistory.length > MEMEGEN_MAX_HISTORY) memegenHistory.pop();
+  memegenRenderHistory();
+}
+
+function memegenRenderHistory() {
+  const section = document.getElementById('memegen-history-section');
+  const grid    = document.getElementById('memegen-history-grid');
+  if (!grid || !section) return;
+  if (memegenHistory.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  grid.innerHTML = '';
+  memegenHistory.forEach(({ src, prompt }) => {
+    const item = document.createElement('div');
+    item.className = 'memegen-history-item';
+    item.title = prompt;
+    item.onclick = () => {
+      // Load this history item back into the result view
+      const wrap = document.getElementById('memegen-img-wrap');
+      const img  = document.createElement('img');
+      img.src = src;
+      img.style.cssText = 'max-width:100%;max-height:520px;width:100%;height:auto;object-fit:contain;display:block;';
+      if (wrap) { wrap.innerHTML = ''; wrap.appendChild(img); }
+      memegenCurrentImage = img;
+      memegenCurrentPrompt = prompt;
+      const caption = document.getElementById('memegen-result-prompt');
+      if (caption) caption.textContent = `"${prompt}"`;
+      memegenSetState('result');
+      document.getElementById('memegen-result')?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = prompt;
+    img.loading = 'lazy';
+
+    const label = document.createElement('div');
+    label.className = 'memegen-history-item-label';
+    label.textContent = prompt;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'memegen-history-item-save';
+    saveBtn.textContent = '💾';
+    saveBtn.title = 'Save this image';
+    saveBtn.onclick = e => { e.stopPropagation(); memegenSave(src, prompt); };
+
+    item.append(img, label, saveBtn);
+    grid.appendChild(item);
+  });
+}
+
+function memegenClearHistory() {
+  memegenHistory = [];
+  memegenRenderHistory();
+}
+
+// Wire up switchTab for memegen
+const _origSwitchTab = switchTab;
+// (switchTab already handles arbitrary tabs via panel ID, just add memegen hook)
